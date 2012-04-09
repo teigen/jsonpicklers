@@ -1,6 +1,5 @@
 package jsonpicklers
 
-import annotation.implicitNotFound
 import net.liftweb.json.JsonAST._
 
 import util.matching.Regex
@@ -9,101 +8,86 @@ case class ~[+A, +B](_1:A, _2:B){
   def ~[C](c:C) = new ~(this, c)
 }
 
-@implicitNotFound("Don't know how to wrap ${A} in ${B}")
-trait Wrap[A, B] { wrapper =>
-  def wrap(value:A):B
-  def unwrap(value:B):A
-
-  def apply(self:JsonType[A])     = self.wrap(this)
-  def apply(self:JsonObject[A])   = self.wrap(this)
-  def apply(self:JsonProperty[A]) = self.wrap(this)
+trait Optional[A, Like[_]]{    
+  def ? : Like[Option[A]] with JsonLike[Option[A], Like]
+  def ? (other: => A):Like[A] = ?.getOrElse(other)
 }
 
-object Wrap{
-  def apply[A, B](w:A => B)(u:B => A):Wrap[A, B] = new Wrap[A, B]{
-    def wrap(value: A)   = w(value)
-    def unwrap(value: B) = u(value)
-  }
-}
+sealed trait JsonLike[A, Like[_]] { 
 
-object JsonType{
+  def flatWrap[B](w:(A, Location, JValue) => Result[B])(u:B => A):Like[B]    
   
-  def apply[A](pickle:A => JValue, unpickle:(Location, JValue) => Result[A]):JsonType[A] = {
-    val p = pickle
-    val u = unpickle
-    
-    new JsonType[A]{
-      def unpickle(location: Location, json: JValue) = u(location, json)
-      def pickle(value: A) = p(value)
-    }
-  }
-}
+  def filter(predicate:A => Boolean, msg:String):Like[A] =
+    flatWrap((a, location, json) => if(predicate(a)) Success(a, location, json) else Failure(msg, location, json))(a => if(predicate(a)) a else sys.error(msg))
 
-trait JsonType[A] { self =>
+  def as[B](implicit wrapper: Wrap[A, B]):Like[B] = 
+    wrap(wrapper.wrap)(wrapper.unwrap)
+  
+  def wrap[B](w: (A) => B)(u: (B) => A):Like[B] = 
+    flatWrap((a, location, json) => Success(w(a), location, json))(u)
 
-  def apply(values:A*) = filter(values.contains, "expected one of " + values.mkString("(", ",", ")"))
-
-  def :: (name:String)                  = property(name, self)
-  def :: (selector:JsonProperty.Filter) = properties(selector.filter, self)
-
-  def * = array(this)
-  
-  def | [B >: A](co:CoVariantJsonType[B])(implicit reify:Reify[A]) = or(co) 
-  def or[B >: A](co:CoVariantJsonType[B])(implicit reify:Reify[A]) = CoVariantJsonType.covariantJsonType(this) or co
-  
-  def filter(predicate:A => Boolean, msg:String) = 
-    flatWrap[A](v => if(predicate(v)) pickle(v) else sys.error(msg))((value, location, json) => if(predicate(value)) Success(value, location, json) else Failure(msg, location, json))
-  
-  def flatWrap[B](pickle:(B) => JValue)(unpickle:(A, Location, JValue) => Result[B]):JsonType[B] = 
-    JsonType[B](pickle, (location, json) => self.unpickle(location, json).flatMap(a => unpickle(a, location, json)))
-  
   def <  (rhs:A)(implicit ordering:Ordering[A])   = filter(lhs => ordering.lt(lhs, rhs),    "expected < " + rhs)
   def <= (rhs:A)(implicit ordering:Ordering[A])   = filter(lhs => ordering.lteq(lhs, rhs),  "expected <= " + rhs)
   def >  (rhs:A)(implicit ordering:Ordering[A])   = filter(lhs => ordering.gt(lhs, rhs),    "expected > " + rhs)
   def >= (rhs:A)(implicit ordering:Ordering[A])   = filter(lhs => ordering.gteq(lhs, rhs),  "expected >= " + rhs)
-  def equiv(rhs:A)(implicit ordering:Ordering[A]) = filter(lhs => ordering.equiv(lhs, rhs), "expected equiv " + rhs)   
+  def equiv(rhs:A)(implicit ordering:Ordering[A]) = filter(lhs => ordering.equiv(lhs, rhs), "expected equiv " + rhs)
 
-  def wrap[B](implicit wrapper:Wrap[A, B]):JsonType[B] = wrap(wrapper.wrap, wrapper.unwrap)
-  def wrap[B](w:A => B, u:B => A) = flatWrap[B](b => pickle(u(b)))((a, location, json) => Success(w(a), location, json))
+  def apply(values:A*) = filter(values.contains, "expected one of " + values.mkString("(", ",", ")"))
 
-  def unpickle(json:JValue):Result[A] = unpickle(Root, json) match {
+  def getOrElse[B](other:B)(implicit ev1:A <:< Option[B], ev2: Option[B] <:< A) =
+    wrap(_.getOrElse(other))(Some(_))  
+}
+
+trait JsonTypeLike[A]{
+  def asType:JsonType[A]
+
+  def :: (name:String)                  = property(name, this)
+  def :: (selector:JsonProperty.Filter) = properties(selector.filter, this)
+  
+  def unpickle(json:JValue):Result[A] = asType.unpickle(Root, json) match {
     case Success(value, _, _) => Success(value, Root, json)
     case f => f
   }
 
-  def unpickle(location:Location, json:JValue):Result[A]
-  def pickle(value:A):JValue
+  def * = array(this)
 }
 
-object JsonObject {
-  def apply[A](pickle:A => JObject, unpickle:(Location, JValue) => Result[A]):JsonObject[A] = {
-    val p = pickle
-    val u = unpickle
-    new JsonObject[A]{
-      def pickle(value: A) = p(value)
-      def unpickle(location: Location, json: JValue) = u(location, json)
-    }
+object JsonType extends Primitives
+
+case class JsonType[A](pickle:A => JValue, unpickle:(Location, JValue) => Result[A]) extends JsonLike[A, JsonType] with JsonTypeLike[A] with Optional[A, JsonType]{ self =>
+  
+  def asType = this
+  
+  def flatWrap[B](w:(A, Location, JValue) => Result[B])(u:B => A):JsonType[B] = 
+    JsonType[B](u andThen pickle, (location, json) => unpickle(location, json).flatMap(a => w(a, location, json)))
+
+  def ? = JsonType(_.map(self.pickle).getOrElse(JNull), (location, json) => self.unpickle(location, json).map(Some(_)) orElse NULL.unpickle(location, json).map(_ => None))
+
+  def | [B >: A](co:CoVariantJsonType[B])(implicit reify:Reify[A]) = or(co) 
+  def or[B >: A](co:CoVariantJsonType[B])(implicit reify:Reify[A]) = CoVariantJsonType.covariantJsonType(this) or co  
+}
+
+trait JsonObjectLike[A] {
+  def asObject:JsonObject[A]
+  
+  def ~[B](o:JsonObjectLike[B]) = {
+    val self = asObject
+    val other = o.asObject
+    JsonObject[A ~ B]({ case a ~ b => JObject(self.pickle(a).obj ++ other.pickle(b).obj) }, (location, json) => self.unpickle(location, json).flatMap(a => other.unpickle(location, json).map(b => new ~(a, b))))
   }
-  
-  def filter[A](self:JsonObject[A], predicate:A => Boolean, msg:String) = JsonObject[A](a => if(predicate(a)) self.pickle(a) else sys.error("filter " + a), self.unpickle(_, _).filter(predicate, msg))
+
+  def | [B >: A](co:CoVariantJsonObject[B])(implicit reify:Reify[A])  = or(co)
+  def or[B >: A](co:CoVariantJsonObject[B])(implicit reify:Reify[A]) = CoVariantJsonObject.covariantJsonObject(asObject) or co
 }
 
-trait JsonObject[A] extends JsonType[A] { self =>
+case class JsonObject[A](pickle:A => JObject, unpickle:(Location, JValue) => Result[A]) extends JsonLike[A, JsonObject] with JsonTypeLike[A] with JsonObjectLike[A] with Optional[A, JsonType]{ self =>
 
-  def flatWrap[B](pickle:(B) => JObject)(unpickle:(A, Location, JValue) => Result[B]):JsonObject[B] =
-    JsonObject[B](pickle, (location, json) => self.unpickle(location, json).flatMap(a => unpickle(a, location, json)))
-  
-  def ~[B](other:JsonObject[B]) = this.flatWrap[A ~ B]((ab:A~B) => JObject(pickle(ab._1).obj ++ other.pickle(ab._2).obj))((a:A, location:Location, json:JValue) => other.unpickle(location, json).map(b => new ~(a, b)))
+  def asType = JsonType(pickle, unpickle)
+  def asObject = this
+  def ? = asType.?
 
-  override def filter(predicate:A => Boolean, msg:String) = JsonObject.filter(this, predicate, msg)
-  
-  def | [B >: A](co:CoVariantJsonObject[B])(implicit reify:Reify[A])  = or(co)
-  def or[B >: A](co:CoVariantJsonObject[B])(implicit reify:Reify[A]) = CoVariantJsonObject.covariantJsonObject(this) or co
-
-  override def wrap[B](implicit wrapper:Wrap[A, B]):JsonObject[B] = wrap(wrapper.wrap, wrapper.unwrap)
-  override def wrap[B](w:A => B, u:B => A) = JsonObject[B](b => pickle(u(b)), unpickle(_, _).map(w))
-  
-  override def pickle(value:A):JObject
+  def flatWrap[B](w:(A, Location, JValue) => Result[B])(u:B => A):JsonObject[B] =
+    JsonObject[B](u andThen pickle, (location, json) => unpickle(location, json).flatMap(a => w(a, location, json)))    
 }
 
 object JsonProperty {
@@ -113,26 +97,51 @@ object JsonProperty {
   val all = Filter(_ => true)
 
   implicit def regex(r:Regex) = Filter{ case JField(name, _) => r.pattern.matcher(name).matches() }
+
+  def properties[A](predicate:JField => Boolean, self:JsonType[A]):JsonType[Map[String, A]] = { 
+    
+    def unpickle(location: Location, json: JValue) = {
+      val fields = json match {
+        case JObject(f) => f
+        case _ => Nil
+      }
+      val result = fields.filter(predicate).foldRight[Result[List[(String, A)]]](Success(Nil, location, json)) {
+        case (JField(name, value), acc) => for {
+          r <- self.unpickle(location(name), value)
+          t <- acc
+        } yield (name, r) :: t
+      }
+      result.map(_.toMap)
+    }
+
+    def pickle(value: Map[String, A]) = {
+      val fields = value.toList.map{ case (k,v) => JField(k, self.pickle(v)) }
+      JObject(fields.filter(predicate))
+    }
+    
+    JsonType(pickle, unpickle)
+  }
 }
 
-case class JsonProperty[A](name:String, jsonType:JsonType[A]) extends JsonObject[A]{
-  def unpickle(location: Location, json: JValue) = jsonType.unpickle(location, json \ name)
-  
-  override def pickle(value: A) = jsonType.pickle(value) match {
+case class JsonProperty[A](name:String, jsonType:JsonType[A]) extends JsonLike[A, JsonProperty] with JsonTypeLike[A] with JsonObjectLike[A] with Optional[A, JsonProperty]{
+
+  def pickle(value: A) = jsonType.pickle(value) match {
     case JNothing => JObject(Nil)
     case something => JObject(List(JField(name, something)))
   }
-  
-  def ? = option(this)
-  
-  def ? (other: => A):JsonProperty[A] = ?.getOrElse(other)
 
-  def getOrElse[B](other:B)(implicit ev1:A <:< Option[B], ev2: Option[B] <:< A) =
-    wrap[B]((a:A) => a.getOrElse(other), (b:B) => Some(b):A)
+  def unpickle(location: Location, json: JValue) = jsonType.unpickle(location(name), json \ name)
 
-  override def wrap[B](implicit wrapper:Wrap[A, B]) = wrap(wrapper.wrap, wrapper.unwrap)
-  override def wrap[B](w:A => B, u:B => A):JsonProperty[B] = JsonProperty[B](name, jsonType.wrap(w, u))
+  def asType   = JsonType(pickle, unpickle)
+  def asObject = JsonObject(pickle, unpickle)
 
+  def flatWrap[B](w:(A, Location, JValue) => Result[B])(u:B => A) =
+    JsonProperty[B](name, jsonType.flatWrap(w)(u))
+
+  def ? = JsonProperty[Option[A]](name, JsonType[Option[A]](_.map(jsonType.pickle).getOrElse(JNothing), {
+    case (location, json@JNothing) => Success(None, location, json)
+    case (location, json) => jsonType.unpickle(location, json).map(Some(_))
+  }))
 }
 
 

@@ -1,0 +1,274 @@
+package twitter
+
+import jsonpicklers._
+import tuples._
+import syntax._
+
+import net.liftweb.json.JsonAST.JValue
+import java.net.{MalformedURLException, URL}
+
+object Types {
+  val url = {
+    def noProtocol(s:String) = "no protocol:.*".r.pattern.matcher(s).matches()
+    def pickle(url:URL) = url.toString
+    def unpickle(s:String, location:Location, json:JValue):Result[URL] = try{
+      Success(new URL(s), location, json)
+    } catch {
+      case ex:MalformedURLException if noProtocol(ex.getMessage) => unpickle("http://" + s, location, json) 
+      case ex => Failure(ex.getMessage, location, json)
+    }
+    string.flatWrap(unpickle)(pickle)
+  }
+  
+  implicit val reifyURL = Reify[URL]{
+    case url:URL => url
+  }
+}
+
+import Types._
+
+object Entities {
+  val json = Wrap(apply)(unapply(_).get){
+    ("urls" :: array(TweetURL.json)) ~
+    ("user_mentions" :: array(UserMention.json)) ~
+    ("hashtags" :: array(HashTag.json)) ~
+    ("media" :: array(Media.json)).?(Nil)
+  } 
+}
+
+case class Entities(urls:List[TweetURL], 
+                    userMentions:List[UserMention], 
+                    hashtags:List[HashTag], 
+                    media:List[Media])
+
+object Media {
+  val json = Wrap(apply)(unapply(_).get){
+    ("id"              :: integer) ~
+    ("id_str"          :: string) ~
+    ("media_url"       :: url) ~
+    ("media_url_https" :: url) ~
+    ("url"             :: url) ~
+    ("dislplay_url"    :: url) ~
+    ("expanded_url"    :: url) ~
+    ("sizes"           :: (* :: Size.json)) ~
+    ("type"            :: "photo") ~
+    ("indices"         :: array(integer))
+  }
+}
+
+case class Media(id:Int, idStr:String, 
+                 mediaURL:URL, 
+                 mediaURLHttps:URL,
+                  url:URL,
+                  displayURL:URL,
+                  expandedURL:URL,
+                  sizes:Map[String, Size],
+                  mediaType:String,
+                  indices:List[Int])
+
+object Size {
+  val json = Wrap(apply)(unapply(_).get){
+    ("w"      :: integer) ~
+    ("h"      :: integer) ~
+    ("resize" :: string("crop", "fit"))
+  }
+}
+
+case class Size(w:Int, 
+                h:Int, 
+                resize:String)
+
+object TweetURL {
+  val json = Wrap(apply)(unapply(_).get){
+    ("url"          :: url) ~
+    ("display_url"  :: url) ~
+    ("expanded_url" :: url) ~
+    ("indices"      :: array(integer))
+  }
+}
+
+case class TweetURL(url:URL, 
+                    displayURL:URL, 
+                    expandedURL:URL, 
+                    indices:List[Int])
+
+object UserMention {
+  val json = Wrap(apply)(unapply(_).get){
+    ("id"          :: integer) ~
+    ("id_str"      :: string) ~
+    ("screen_name" :: string) ~
+    ("name"        :: string) ~ 
+    ("indices"     :: array(integer))
+  }
+}
+
+case class UserMention(id:Int, 
+                       idStr:String, 
+                       screenName:String, 
+                       name:String, 
+                       indices:List[Int])
+
+
+object HashTag {
+  val json = Wrap(apply)(unapply(_).get){  
+    ("text"    :: string) ~
+    ("indices" :: array(integer))
+  }  
+}
+
+case class HashTag(text:String, 
+                   indices:List[Int])
+
+/* timeline */
+object TimeLine {
+  val json = Wrap(apply)(unapply(_).get){
+    array(Tweet.json)
+  }
+}
+case class TimeLine(tweets:List[Tweet])
+
+object Tweet {
+  val json = Wrap(apply)(unapply(_).get){
+    ("id"                        :: bigint) ~
+    ("id_str"                    :: string) ~
+    ("created_at"                :: string) ~
+    ("favorited"                 :: boolean) ~
+    ("in_reply_to_screen_name"   :: (string | NULL)) ~
+    ("in_reply_to_user_id"       :: (bigint | NULL)) ~
+    ("in_reply_to_user_id_str"   :: (string | NULL)) ~
+    ("in_reply_to_status_id"     :: (bigint | NULL)) ~
+    ("in_reply_to_status_id_str" :: (string | NULL)) ~
+    ("text"                      :: string) ~
+    ("retweet_count"             :: integer) ~
+    ("truncated"                 :: boolean) ~
+    ("retweeted"                 :: boolean) ~
+    ("source"                    :: string) ~
+    ("entities"                  :: Entities.json).? ~
+    ("user"                      :: User.json)
+  }
+  //        ("place"                     :: NULL)
+  //        ("geo"                       :: NULL)
+  //        ("coordinates"               :: NULL)
+  //        ("contributors"              :: NULL)
+}
+
+case class Tweet(id: BigInt,
+                 idStr: String,
+                 createAt: String,
+                 favorited: Boolean,
+                 inReplyToScreenName: String,
+                 inReplyToUserId: BigInt,
+                 inReplyToUserIdStr: String,
+                 inReplyToStatusId: BigInt,
+                 inReplyToStatusIdStr: String,
+                 text: String, retweetCount: Int,
+                 truncated: Boolean,
+                 retweeted: Boolean,
+                 source: String,
+                 entities:Option[Entities],
+                 user: User)
+
+object User {
+  val json = Wrap(apply)(unapply(_).get){
+    UserData.json ~ UserCount.json ~ UserProfile.json ~ UserFlags.json
+  } 
+}
+
+case class User(data:UserData, count:UserCount, profile:UserProfile, flags:UserFlags)
+
+
+object UserData {
+    val json = Wrap(apply)(unapply(_).get){
+      ("id"          :: bigint ) ~
+      ("id_str"      :: string ) ~
+      ("url"         :: (url | NULL)) ~
+      ("created_at"  :: string ) ~
+      ("utc_offset"  :: option(integer)) ~
+      ("screen_name" :: string ) ~
+      ("name"        :: string ) ~
+      ("time_zone"   :: option(string)) ~
+      ("location"    :: option(string) ) ~
+      ("lang"        :: string ) ~
+      ("description" :: option(string) )
+    }
+}
+
+case class UserData(id:BigInt, 
+                    idStr:String, 
+                    url:URL, 
+                    createdAt:String, 
+                    utcOffset:Option[Int], 
+                    screenName:String, 
+                    name:String, 
+                    timeZone:Option[String], 
+                    location:Option[String], 
+                    lang:String, 
+                    description:Option[String])
+      
+object UserCount {
+  val json = Wrap(apply)(unapply(_).get){
+    ("listed_count"     :: integer) ~
+    ("friends_count"    :: integer) ~
+    ("statuses_count"   :: integer) ~
+    ("followers_count"  :: integer) ~
+    ("favourites_count" :: integer)
+  }
+}
+
+case class UserCount(listed:Int, friends:Int, statuses:Int, followers:Int, favourites:Int)
+
+object UserProfile {
+  val json = Wrap(apply)(unapply(_).get){
+    ("profile_use_background_image"       :: boolean) ~
+    ("profile_background_image_url_https" :: url    ) ~
+    ("profile_text_color"                 :: string ) ~
+    ("profile_sidebar_border_color"       :: string ) ~
+    ("profile_image_url"                  :: url    ) ~
+    ("profile_background_tile"            :: boolean) ~
+    ("default_profile_image"              :: boolean) ~
+    ("profile_sidebar_fill_color"         :: string ) ~
+    ("profile_background_color"           :: string ) ~
+    ("profile_image_url_https"            :: url    ) ~
+    ("profile_background_image_url"       :: url    ) ~
+    ("default_profile"                    :: boolean) ~
+    ("profile_link_color"                 :: string )
+  }
+}
+
+case class UserProfile(useBackgroundImage: Boolean,
+                       backgroundImageUrlHttps: URL,
+                       textColor: String,
+                       sidebarCorderColor: String,
+                       imageURL: URL,
+                       backgroundTile: Boolean,
+                       profileImage: Boolean,
+                       sidebarFillColor: String,
+                       backgroundColor: String,
+                       imageUrlHttps: URL,
+                       backgroundImageURL: URL,
+                       default: Boolean,
+                       linkColor: String)
+
+object UserFlags {
+  val json = Wrap(apply)(unapply(_).get){
+    ("protected"             :: boolean) ~
+    ("geo_enabled"           :: boolean) ~
+    ("contributors_enabled"  :: boolean) ~
+    ("is_translator"         :: boolean) ~
+    ("show_all_inline_media" :: option(boolean)) ~
+    ("notifications"         :: (box(boolean) | NULL)) ~ // box Boolean to allow null value
+    ("follow_request_sent"   :: (boolean | NULL.wrap(_ => false)(_ => null))) ~  // manually wrap null returning false
+    ("following"             :: (boolean | NULL.as[Boolean])) ~ // if null return Boolean default value which is false
+    ("verified"              :: (boolean | NULL.as(false))) // if null return the value false
+  }
+}
+case class UserFlags(`protected`:Boolean, 
+                     geoEnabled:Boolean, 
+                     contributorsEnabled:Boolean,
+                     isTranslator:Boolean,
+                     showAllInlineMedia:Option[Boolean],
+                     notifications:java.lang.Boolean,
+                     followRequestSent:Boolean, 
+                     following:Boolean, 
+                     verified:Boolean)
+

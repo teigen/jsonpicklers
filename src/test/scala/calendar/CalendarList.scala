@@ -46,8 +46,8 @@ object CalendarList {
     ("accessRole"      :: string("freeBusyReader", "reader", "writer", "owner")) ~
     ("defaultReminders":: array(    
       ("method" :: string("email", "sms", "popup")) ~
-      ("minutes":: integer) wrap wrapReminder    
+      ("minutes":: integer) as wrapReminder    
     ))
-  ) wrap wrapCalendarList
+  ) as wrapCalendarList
   
 }

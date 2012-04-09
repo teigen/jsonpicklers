@@ -1,11 +1,11 @@
 package collectionjson
 
 import java.net.{URISyntaxException, URI}
-import net.liftweb.json.JsonAST.{JValue, JString}
+import net.liftweb.json.JsonAST.{JValue}
 import jsonpicklers._
 
 object CollectionJson {
-  
+
   import tuples._
 
   case class CollectionJson(version: String, href: URI, links: List[Link], items: List[Item], queries: List[Query], template: Option[Template], error: Option[Error])
@@ -30,19 +30,19 @@ object CollectionJson {
   implicit val wrapQuery = Wrap(Query)(Query.unapply(_).get)
   implicit val wrapLink = Wrap(Link)(Link.unapply(_).get)
 
-  lazy val collection = "collection" :: (version ~ href ~ links.?(Nil) ~ items.?(Nil) ~ queries.?(Nil) ~ template.? ~ error.?).wrap[CollectionJson]
+  lazy val collection = "collection" :: (version ~ href ~ links.?(Nil) ~ items.?(Nil) ~ queries.?(Nil) ~ template.? ~ error.?).as[CollectionJson]
 
-  lazy val error = "error" :: (title.? ~ code.? ~ message.?).wrap[Error]
+  lazy val error = "error" :: (title.? ~ code.? ~ message.?).as[Error]
 
-  lazy val template = "template" :: data.wrap[Template]
+  lazy val template = "template" :: data.as[Template]
 
-  lazy val items = "items" :: array((href ~ data.?(Nil) ~ links.?(Nil)).wrap[Item])
+  lazy val items = "items" :: array((href ~ data.?(Nil) ~ links.?(Nil)).as[Item])
 
-  lazy val data = "data" :: array((name.? ~ value.? ~ prompt.?).wrap[Data])
+  lazy val data = "data" :: array((name.? ~ value.? ~ prompt.?).as[Data])
 
-  lazy val queries = "queries" :: array((href ~ rel ~ name.? ~ prompt.? ~ data.?(Nil)).wrap[Query])
+  lazy val queries = "queries" :: array((href ~ rel ~ name.? ~ prompt.? ~ data.?(Nil)).as[Query])
 
-  lazy val links = "links" :: array((href ~ rel ~ name.? ~ render.? ~ prompt.?).wrap[Link])
+  lazy val links = "links" :: array((href ~ rel ~ name.? ~ render.? ~ prompt.?).as[Link])
 
   lazy val code = "code" :: string
 
@@ -64,17 +64,12 @@ object CollectionJson {
 
   lazy val version = "version" :: string
 
-  object URI extends JsonType[URI] {
-    def unpickle(location: Location, json: JValue) = json match {
-      case JString(a) =>
-        try {
-          Success(new URI(a), location, json)
-        } catch {
-          case ex: URISyntaxException => Failure("expected URI, but got exception: " + ex.getMessage, location, json)
-        }
-      case _ => Failure("expected URI (STRING)", location, json)
+  val URI = {
+    def unpickle(s: String, location: Location, json: JValue) = try {
+      Success(new URI(s), location, json)
+    } catch {
+      case ex: URISyntaxException => Failure(ex.getMessage, location, json)
     }
-
-    def pickle(a: URI) = JString(a.toString)
+    string.flatWrap(unpickle)(_.toString)
   }
 }

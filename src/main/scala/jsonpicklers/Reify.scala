@@ -19,6 +19,10 @@ object Reify {
   implicit val int = Reify[Int]{
     case i:Int => i
   }
+  
+  implicit val jInteger = Reify[java.lang.Integer]{
+    case i:java.lang.Integer => i
+  }
 
   implicit val bigint = Reify[BigInt]{
     case b:BigInt => b
@@ -31,22 +35,30 @@ object Reify {
   implicit val boolean = Reify[Boolean]{
     case b:Boolean => b
   }
+  
+  implicit val jBoolean = Reify[java.lang.Boolean]{
+    case b:java.lang.Boolean => b
+  }
+  
+  implicit val NULL = Reify[Null]{
+    case null => null
+  }
 
-  implicit def reifyList[A : Reify]:Reify[List[A]] = {
+  implicit def list[A : Reify]:Reify[List[A]] = {
     val reify = implicitly[Reify[A]].reify
     Reify[List[A]]{
       case list:List[_] if list.forall(reify.isDefinedAt) => list.map(reify)
     }
   }
 
-  implicit def reifyOption[A : Reify]:Reify[Option[A]] = {
+  implicit def option[A : Reify]:Reify[Option[A]] = {
     val reify = implicitly[Reify[A]].reify
     Reify[Option[A]]{
       case option:Option[_] if option.forall(reify.isDefinedAt) => option.map(reify)
     }
   }
 
-  implicit def reifyMap[A : Reify, B : Reify] = {
+  implicit def map[A : Reify, B : Reify] = {
     val reifyA = implicitly[Reify[A]].reify
     val reifyB = implicitly[Reify[B]].reify
     Reify[Map[A, B]]{

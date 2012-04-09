@@ -1,25 +1,29 @@
-import net.liftweb.json.JsonAST.JField
+import net.liftweb.json.JsonAST.{JField}
 
 package object jsonpicklers {
   val *       = JsonProperty.all
   
-  val string  = Primitive.string
+  val string  = JsonType.string
   
-  val boolean = Primitive.boolean
+  val boolean = JsonType.boolean
   
-  val double  = Primitive.double
+  val double  = JsonType.double
   
-  val integer = Primitive.integer
+  val integer = JsonType.integer
   
-  val bigint  = Primitive.bigint
+  val bigint  = JsonType.bigint
   
-  val NULL    = Primitive.NULL
+  val long    = JsonType.long
+  
+  val NULL    = JsonType.NULL
 
-  def array[A](a:JsonType[A]) = Primitive.array(a)
+  def array[A](a:JsonTypeLike[A]) = JsonType.array[A](a.asType)
 
-  def option[A](self:JsonProperty[A]) = Primitive.option[A](self)
+  def box[A <: AnyVal, B <: Object, Like[_]](a:JsonLike[A, Like])(implicit ev:Boxable[A, B]) = ev.box(a)
 
-  def property[A](name:String, self:JsonType[A]) = Combinators.property[A](name, self)
+  def option[A, Like[_]](self:Optional[A, Like]) = self.?
 
-  def properties[A](predicate:JField => Boolean, self:JsonType[A]) = Combinators.properties(predicate, self)
+  def property[A](name:String, json:JsonTypeLike[A]) = JsonProperty(name, json.asType)
+
+  def properties[A](predicate:JField => Boolean, self:JsonTypeLike[A]) = JsonProperty.properties(predicate, self.asType)
 } 
