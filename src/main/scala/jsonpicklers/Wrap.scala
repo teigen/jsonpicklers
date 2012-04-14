@@ -1,12 +1,13 @@
 package jsonpicklers
 
 import annotation.implicitNotFound
+import net.liftweb.json.JsonAST.JValue
 
 @implicitNotFound("Don't know how to wrap ${A} in ${B}")
 trait Wrap[A, B] { wrapper =>
   def wrap(value:A):B
   def unwrap(value:B):A
-  def apply[Like[_]](like:JsonLike[A, Like]) = like as this
+  def apply[Pickle <: JValue, Like[_]](like:JsonLike[A, Pickle, Like]) = like as this
 }
 
 object Wrap{

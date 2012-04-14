@@ -52,7 +52,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   }
 
   property("property") {
-    forAll(arbitrary[String].suchThat(_.size > 1), arbitrary[Int]) {
+    forAll(arbitrary[String].suchThat(!_.isEmpty), arbitrary[Int]) {
       (name, value) =>
         val json = JObject(List(JField(name, JInt(value))))
         val field = name :: integer
@@ -81,7 +81,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   }
 
   property("option") {
-    forAll(arbitrary[String].suchThat(_.size > 0), arbitrary[Option[Int]]) {
+    forAll(arbitrary[String].suchThat(!_.isEmpty), arbitrary[Option[Int]]) {
       (name, value) =>
         val json = JObject(value.map(value => JField(name, JInt(value))).toList)
         val field = option(name :: integer)

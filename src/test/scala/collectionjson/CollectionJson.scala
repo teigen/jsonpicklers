@@ -70,6 +70,6 @@ object CollectionJson {
     } catch {
       case ex: URISyntaxException => Failure(ex.getMessage, location, json)
     }
-    string.flatWrap(unpickle)(_.toString)
+    string.flatWrap(unpickle)((p, b) => p(b.toString))
   }
 }

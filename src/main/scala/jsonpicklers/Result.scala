@@ -10,6 +10,8 @@ sealed trait Result[+A]{
   
   def isSuccess:Boolean
   def isFailure = !isSuccess
+  
+  def get:A
 }
 case class Success[+A](value:A, location:Location, json:JValue) extends Result[A]{
   def map[B](f: (A) => B) = Success(f(value), location, json)
@@ -19,12 +21,13 @@ case class Success[+A](value:A, location:Location, json:JValue) extends Result[A
     if(f(value)) this else Failure(message, location, json)
 
   def isSuccess = true
+  def get = value
 }
 case class Failure(message:String, location:Location, value:JValue) extends Result[Nothing]{
   def map[B](f: (Nothing) => B) = this
   def flatMap[B](f: (Nothing) => Result[B]) = this
   def orElse[B >: Nothing](other: => Result[B]):Result[B] = other
   def filter(f: (Nothing) => Boolean, message: => String) = this
-
   def isSuccess = false
+  def get = throw new NoSuchElementException(toString)
 }

@@ -1,4 +1,4 @@
-import net.liftweb.json.JsonAST.{JField}
+import net.liftweb.json.JsonAST.{JValue, JField}
 
 package object jsonpicklers {
   val *       = JsonProperty.all
@@ -19,7 +19,7 @@ package object jsonpicklers {
 
   def array[A](a:JsonTypeLike[A]) = JsonType.array[A](a.asType)
 
-  def box[A <: AnyVal, B <: Object, Like[_]](a:JsonLike[A, Like])(implicit ev:Boxable[A, B]) = ev.box(a)
+  def box[A <: AnyVal, B <: Object, Pickle <: JValue, Like[_]](a:JsonLike[A, Pickle, Like])(implicit ev:Boxable[A, B]) = ev.box(a)
 
   def option[A, Like[_]](self:Optional[A, Like]) = self.?
 

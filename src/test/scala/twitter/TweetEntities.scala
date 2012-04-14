@@ -10,14 +10,13 @@ import java.net.{MalformedURLException, URL}
 object Types {
   val url = {
     def noProtocol(s:String) = "no protocol:.*".r.pattern.matcher(s).matches()
-    def pickle(url:URL) = url.toString
     def unpickle(s:String, location:Location, json:JValue):Result[URL] = try{
       Success(new URL(s), location, json)
     } catch {
       case ex:MalformedURLException if noProtocol(ex.getMessage) => unpickle("http://" + s, location, json) 
       case ex => Failure(ex.getMessage, location, json)
     }
-    string.flatWrap(unpickle)(pickle)
+    string.flatWrap(unpickle)((p, v) => p(v.toString))
   }
   
   implicit val reifyURL = Reify[URL]{
