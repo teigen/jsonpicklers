@@ -3,38 +3,42 @@ package pickles
 import net.liftweb.json.JsonAST._
 
 sealed trait Location {
+  def json:JValue
+  
   override def toString = this match {
-    case Root => ""
-    case ArrayLocation(index, parent) => parent.toString + "["+index+"]"
-    case FieldLocation(name, Root)    => name
-    case FieldLocation(name, parent)  => parent.toString+"."+name
+    case Root(_) => ""
+    case ArrayLocation(_, index, parent) => parent.toString + "["+index+"]"
+    case FieldLocation(_, name, Root(_)) => name
+    case FieldLocation(_, name, parent)  => parent.toString+"."+name
   }
-  def apply(name:String) = FieldLocation(name, this)
-  def apply(index:Int)   = ArrayLocation(index, this)
+  def apply(name:String) = FieldLocation(json \ name, name, this)
+  def apply(index:Int)   = ArrayLocation(json(index), index, this)
 }
 
-object Root extends Location
-case class FieldLocation(name:String, parent:Location) extends Location
-case class ArrayLocation(index:Int, parent:Location) extends Location
+case class Root(json:JValue) extends Location
+case class FieldLocation(json:JValue, name:String, parent:Location) extends Location
+case class ArrayLocation(json:JValue, index:Int, parent:Location) extends Location
 
 trait Result[+A]{
   def map[B](f:A => B) = this match {
-    case Success(value, location, json) => Success(f(value), location, json)
-    case f:Failure                      => f
+    case Success(value, location) => Success(f(value), location)
+    case f:Failure                => f
   }  
   def flatMap[B](f:A => Result[B]) = this match {
-    case Success(value, location, json) => f(value)
-    case f:Failure                      => f
+    case Success(value, location) => f(value)
+    case f:Failure                => f
   }
   def orElse[B >: A](other: => Result[B]) = this match {
     case f:Failure => other
     case n         => n
   }
 }
-case class Success[+A](value:A, location:Location, json:JValue) extends Result[A]
-case class Failure(msg:String, location:Location, json:JValue) extends Result[Nothing]
+case class Success[+A](value:A, location:Location) extends Result[A]
+case class Failure(msg:String, location:Location) extends Result[Nothing]
 
-case class ~[+A, +B](_1:A, _2:B)
+case class ~[+A, +B](_1:A, _2:B){
+  def ~[C](c:C) = new ~(this, c)
+}
 
 trait Optional[Like[_]]{
   def optional[A](like:Like[A]):Like[Option[A]]
@@ -43,9 +47,9 @@ trait Optional[Like[_]]{
 object Optional{
   implicit val jsonField = new Optional[JsonField]{
     def optional[A](like: JsonField[A]) = JsonField[Option[A]](like.name, new JsonValue[Option[A]] {
-      def unpickle(json: JValue, location:Location) = json match {
-        case JNothing => Success(None, location, json)
-        case _ => like.value.unpickle(json, location).map(Some(_))
+      def unpickle(location:Location) = location.json match {
+        case JNothing => Success(None, location)
+        case _ => like.value.unpickle(location).map(Some(_))
       }
       def pickle(a: Option[A]) = a.map(like.value.pickle).getOrElse(JNothing)
     })
@@ -54,9 +58,9 @@ object Optional{
   implicit val jsonValue = new Optional[JsonValue]{
     def optional[A](like: JsonValue[A]) = new JsonValue[Option[A]]{
       def pickle(a: Option[A]) = a.map(like.pickle).getOrElse(JNull)
-      def unpickle(json: JValue, location:Location) = json match {
-        case JNull => Success(None, location, json)
-        case _ => like.unpickle(json, location).map(Some(_))
+      def unpickle(location:Location) = location.json match {
+        case JNull => Success(None, location)
+        case _ => like.unpickle(location).map(Some(_))
       }
     }
   }
@@ -70,13 +74,13 @@ object Wrapper{
   implicit val wrapObject = new Wrapper[JsonObject]{
     def wrap[A, B](like: JsonObject[A], w: (A) => B, u: (B) => A) = new JsonObject[B]{
       def pickle(b: B) = like.pickle(u(b))
-      def unpickle(json: JValue, location:Location) = like.unpickle(json, location).map(w)
+      def unpickle(location:Location) = like.unpickle(location).map(w)
     }
   }
   implicit val wrapValue = new Wrapper[JsonValue]{
     def wrap[A, B](like: JsonValue[A], w: (A) => B, u: (B) => A) = new JsonValue[B]{
       def pickle(b: B) = like.pickle(u(b))
-      def unpickle(json: JValue, location:Location) = like.unpickle(json, location).map(w)
+      def unpickle(location:Location) = like.unpickle(location).map(w)
     }
   }
   implicit val wrapField = new Wrapper[JsonField]{
@@ -91,7 +95,7 @@ object Or {
   implicit val jsonValue = new Or[JsonValue]{
     def or[T, A <: T : Reify, B <: T : Reify](a: JsonValue[A], b: JsonValue[B]) = new JsonValue[T]{
       def pickle(t: T) = implicitly[Reify[A]].reify(t).map(a.pickle).orElse(implicitly[Reify[B]].reify(t).map(b.pickle)).get
-      def unpickle(json: JValue, location:Location) = a.unpickle(json, location).orElse(b.unpickle(json, location))
+      def unpickle(location:Location) = a.unpickle(location).orElse(b.unpickle(location))
     }
   }
 }
@@ -112,26 +116,26 @@ object Reify{
 
 trait Pickler[A, Pickle <: JValue]{
   def pickle(a:A):Pickle
-  def unpickle(json:JValue, location:Location):Result[A]
+  def unpickle(location:Location):Result[A]
 }
 
 trait JsonValue[A] extends Pickler[A, JValue]{
-  def unpickle(json:JValue):Result[A] = unpickle(json, Root)
+  def unpickle(json:JValue):Result[A] = unpickle(Root(json))
 }
 object JsonField{
   implicit def asObject[A](field:JsonField[A]) = new JsonObject[A]{
     def pickle(a: A) = field.pickle(a)
-    def unpickle(json: JValue, location:Location) = field.unpickle(json, location)
+    def unpickle(location:Location) = field.unpickle(location)
   }
 }
 case class JsonField[A](name:String, value:JsonValue[A]) extends Pickler[A, JObject]{
   def pickle(a: A) = JObject(List(JField(name, value.pickle(a))))
-  def unpickle(json: JValue, location:Location) = value.unpickle(json \ name, location(name))
+  def unpickle(location:Location) = value.unpickle(location(name))
 }
 object JsonObject{
   implicit def asValue[A](obj:JsonObject[A]) = new JsonValue[A]{
     def pickle(a: A) = obj.pickle(a)
-    def unpickle(json: JValue, location:Location) = obj.unpickle(json, location)
+    def unpickle(location:Location) = obj.unpickle(location)
   }
 }
 trait JsonObject[A] extends Pickler[A, JObject]
@@ -238,7 +242,7 @@ object Json {
   
   def primitive[A](name:String)(u:PartialFunction[JValue, A])(p:A => JValue):JsonValue[A] = new JsonValue[A]{
     def pickle(a: A) = p(a)
-    def unpickle(json: JValue, location:Location) = u.lift(json).map(v => Success(v, location, json)).getOrElse(Failure("expected " + name, location, json))
+    def unpickle(location:Location) = u.lift(location.json).map(v => Success(v, location)).getOrElse(Failure("expected " + name, location))
   }
   
   val string  = primitive("string"){ case JString(s) => s }(JString(_))
@@ -247,23 +251,23 @@ object Json {
   
   def array[A](value:JsonValue[A]):JsonValue[List[A]] = new JsonValue[List[A]] {
     def pickle(a: List[A]) = JArray(a.map(value.pickle))
-    def unpickle(json: JValue, location:Location) = json match {
-      case JArray(values) => values.zipWithIndex.foldRight[Result[List[A]]](Success(Nil, location, json)){
-        case ((v, index), lst) => for{
-          u <- value.unpickle(v, location(index))
+    def unpickle(location:Location) = location.json match {
+      case JArray(values) => List.range(0, values.size).foldRight[Result[List[A]]](Success(Nil, location)){
+        case (index, lst) => for{
+          u <- value.unpickle(location(index))
           tail <- lst
         } yield u :: tail
       }
-      case _ => Failure("expected array", location, json)
+      case _ => Failure("expected array", location)
     }
   }
   
   def field[A](name:String, value:JsonValue[A]) = JsonField(name, value)
   
   def sequence[A, B](a:JsonObject[A], b:JsonObject[B]):JsonObject[A ~ B] = new JsonObject[~[A, B]] {
-    def unpickle(json: JValue, location:Location) = for{
-      ua <- a.unpickle(json, location)
-      ub <- b.unpickle(json, location)
+    def unpickle(location:Location) = for{
+      ua <- a.unpickle(location)
+      ub <- b.unpickle(location)
     } yield new ~(ua, ub)
     
     def pickle(ab: ~[A, B]) = {
@@ -282,15 +286,15 @@ object Json {
     implicitly[Or[Like]].or(a, b)
   
   def select[A](filter:String => Boolean, value:JsonValue[A]):JsonValue[Map[String, A]] = new JsonValue[Map[String, A]] {
-    def unpickle(json: JValue, location:Location) = json match {
+    def unpickle(location:Location) = location.json match {
       case JObject(fields) => 
-        fields.filter(field => filter(field.name)).foldLeft[Result[Map[String, A]]](Success(Map.empty, location, json)){
+        fields.filter(field => filter(field.name)).foldLeft[Result[Map[String, A]]](Success(Map.empty, location)){
           (map, field) => for{
             m <- map
-            v <- value.unpickle(field.value, location(field.name))
+            v <- value.unpickle(location(field.name))
           } yield m + (field.name -> v)
         }
-      case _ => Failure("expected object", location, json)
+      case _ => Failure("expected object", location)
     }
 
     def pickle(a: Map[String, A]) = JObject(a.toList.map{ case (name, v) => JField(name, value.pickle(v)) })
@@ -313,9 +317,10 @@ object Demo extends App {
   
   
   val demo2 = 
-    "ab" ::
+    (("ab" ::
       (("a" :: int.*) ~
-      ("b" :: string)).wrap(AB)(AB.unapply(_).get)
+      ("b" :: string)).wrap(AB)(AB.unapply(_).get)) ~
+    ("opt" :: string).?).wrap(Ex)(Ex.unapply(_).get)
   
   val pickled = demo.pickle(Ex(AB(List(1,2,3), "foo"), Some("hello")))
   val unpickled = demo.unpickle(pickled)
