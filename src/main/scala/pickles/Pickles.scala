@@ -40,8 +40,46 @@ case class ~[+A, +B](_1:A, _2:B){
   def ~[C](c:C) = new ~(this, c)
 }
 
+trait Pickler[A, Pickle <: JValue]{
+  def pickle(a:A):Pickle
+  def unpickle(location:Location):Result[A]
+}
+
+trait JsonValue[A] extends Pickler[A, JValue]{
+  def unpickle(json:JValue):Result[A] = unpickle(Root(json)) match {
+    case Success(value, _) => Success(value, Root(json))
+    case n => n
+  }
+}
+object JsonField{
+  implicit def asObject[A](field:JsonField[A]) = new JsonObject[A]{
+    def pickle(a: A) = field.pickle(a)
+    def unpickle(location:Location) = field.unpickle(location)
+  }
+  implicit def asValue[A](field:JsonField[A]):JsonValue[A] = new JsonValue[A]{
+    def pickle(a: A) = field.pickle(a)
+    def unpickle(location: Location) = field.unpickle(location)
+  }
+}
+case class JsonField[A](name:String, value:JsonValue[A]) extends Pickler[A, JObject]{
+  def pickle(a: A) = value.pickle(a) match {
+    case JNothing => JObject(Nil)
+    case something => JObject(List(JField(name, something)))
+  }
+  def unpickle(location:Location) = value.unpickle(location(name))
+}
+object JsonObject{
+  implicit def asValue[A](obj:JsonObject[A]) = new JsonValue[A]{
+    def pickle(a: A) = obj.pickle(a)
+    def unpickle(location:Location) = obj.unpickle(location)
+  }
+}
+trait JsonObject[A] extends Pickler[A, JObject]
+
 trait Optional[Like[_]]{
   def optional[A](like:Like[A]):Like[Option[A]]
+  def optional[A](like:Like[A], orElse: => A)(implicit ev:Wrapper[Like]):Like[A] =
+    ev.wrap[Option[A], A](optional(like), _.getOrElse(orElse), Some(_))
 }
 
 object Optional{
@@ -112,38 +150,37 @@ object Reify{
   implicit val string  = pf{ case s:String => s }
   implicit val int     = pf{ case i:Int => i }
   implicit val boolean = pf{ case b:Boolean => b}
+  implicit val NULL    = pf{ case null => null }
+  implicit val bigint  = pf{ case b:BigInt => b }
 }
 
-trait Pickler[A, Pickle <: JValue]{
-  def pickle(a:A):Pickle
-  def unpickle(location:Location):Result[A]
+trait Filter[Like[_]]{
+  def filter[A](value:Like[A], predicate:A => Boolean, msg: => String):Like[A]
 }
 
-trait JsonValue[A] extends Pickler[A, JValue]{
-  def unpickle(json:JValue):Result[A] = unpickle(Root(json))
-}
-object JsonField{
-  implicit def asObject[A](field:JsonField[A]) = new JsonObject[A]{
-    def pickle(a: A) = field.pickle(a)
-    def unpickle(location:Location) = field.unpickle(location)
+object Filter {
+  implicit val jsonValue = new Filter[JsonValue]{
+    def filter[A](value: JsonValue[A], predicate: (A) => Boolean, msg: => String) = new JsonValue[A]{
+      def pickle(a: A) = if(predicate(a)) value.pickle(a) else sys.error("msg") 
+      def unpickle(location: Location) = value.unpickle(location).flatMap(v => if(predicate(v)) Success(v, location) else Failure(msg, location))
+    }
+  }
+  implicit val jsonObject = new Filter[JsonObject]{
+    def filter[A](value: JsonObject[A], predicate: (A) => Boolean, msg: => String) = new JsonObject[A]{
+      def pickle(a: A) = if(predicate(a)) value.pickle(a) else sys.error("msg")
+      def unpickle(location: Location) = value.unpickle(location).flatMap(v => if(predicate(v)) Success(v, location) else Failure(msg, location))
+    }
+  }
+  implicit val jsonField = new Filter[JsonField]{
+    def filter[A](field: JsonField[A], predicate: (A) => Boolean, msg: => String) = JsonField(field.name, Json.filter(field.value, predicate, msg))
   }
 }
-case class JsonField[A](name:String, value:JsonValue[A]) extends Pickler[A, JObject]{
-  def pickle(a: A) = JObject(List(JField(name, value.pickle(a))))
-  def unpickle(location:Location) = value.unpickle(location(name))
-}
-object JsonObject{
-  implicit def asValue[A](obj:JsonObject[A]) = new JsonValue[A]{
-    def pickle(a: A) = obj.pickle(a)
-    def unpickle(location:Location) = obj.unpickle(location)
-  }
-}
-trait JsonObject[A] extends Pickler[A, JObject]
 
 trait JsonObjectSyntaxes {
   class JsonObjectSyntax[A](jsonObject:JsonObject[A]){
     def ~[B] (other:JsonObject[B]) = Json.sequence(jsonObject, other)
     def :: (name:String) = Json.field(name, jsonObject)
+    def :: (selector:Selector) = Json.select(selector.filter, jsonObject)
   }
   implicit def jsonObject[A](jsonObject:JsonObject[A]) = new JsonObjectSyntax[A](jsonObject)
 }
@@ -151,6 +188,8 @@ trait JsonObjectSyntaxes {
 trait JsonFieldSyntaxes {
   class JsonFieldSyntax[A](jsonField:JsonField[A]){
     def ~[B](other:JsonObject[B]) = Json.sequence(jsonField, other)
+    def :: (name:String) = Json.field(name, jsonField)
+    def :: (selector:Selector) = Json.select(selector.filter, jsonField)
   }
   implicit def jsonField[A](jsonField:JsonField[A]) = new JsonFieldSyntax[A](jsonField)
 }
@@ -180,8 +219,10 @@ trait JsonValueSyntaxes {
 trait GenericSyntaxes {
   class GenericSyntax[A, Like[_]](like:Like[A]){
     def ? (implicit ev:Optional[Like]) = Json.option(like)
-    def | [T, B <: T](b:Like[B])(implicit ev:A <:< T, ra:Reify[A], rb:Reify[B], or:Or[Like]) = Json.or(like, b)
+    def ? (orElse: => A)(implicit ev0:Optional[Like], ev1:Wrapper[Like]) = Json.option(like, orElse)
+    def | [T >: A, B <: T](b:Like[B])(implicit ra:Reify[A], rb:Reify[B], or:Or[Like]) = Json.or(like, b)
     def wrap[B](w:A => B)(u:B => A)(implicit ev:Wrapper[Like]) = Json.wrapper(like)(w)(u)
+    def apply(values:A*)(implicit ev:Filter[Like]) = Json.enumerated(like, values:_*)
   }
   implicit def generic[A, Like[_]](like:Like[A]) = new GenericSyntax[A, Like](like)
 }
@@ -247,7 +288,16 @@ object Json {
   
   val string  = primitive("string"){ case JString(s) => s }(JString(_))
   val int     = primitive("int"){ case JInt(i) => i.intValue() }(JInt(_))
+  val bigint  = primitive("bigint"){ case JInt(i) => i }(JInt(_))
   val boolean = primitive("boolean"){ case JBool(b) => b}(JBool(_))
+  val NULL    = new JsonValue[Null]{
+    def pickle(a: Null) = JNull
+    def unpickle(location: Location) = location.json match {
+      case JNull => Success(null, location)
+      case _ => Failure("expected null", location)
+    }
+    def apply[B](value:B):JsonValue[B] = wrapper(this)(_ => value)(_ => null)
+  }
   
   def array[A](value:JsonValue[A]):JsonValue[List[A]] = new JsonValue[List[A]] {
     def pickle(a: List[A]) = JArray(a.map(value.pickle))
@@ -282,6 +332,9 @@ object Json {
   def option[A, Like[_] : Optional](like:Like[A]):Like[Option[A]] = 
     implicitly[Optional[Like]].optional(like)
   
+  def option[A, Like[_] : Optional : Wrapper](like:Like[A], orElse: => A) =
+    implicitly[Optional[Like]].optional(like, orElse)
+  
   def or[T, A <: T : Reify, B <: T : Reify, Like[_] : Or](a:Like[A], b:Like[B]):Like[T] = 
     implicitly[Or[Like]].or(a, b)
   
@@ -299,41 +352,10 @@ object Json {
 
     def pickle(a: Map[String, A]) = JObject(a.toList.map{ case (name, v) => JField(name, value.pickle(v)) })
   }
-}
-
-object Demo extends App {
-  import Json._
-  import syntax._
   
-  case class Ex(ab:AB, opt:Option[String])
-  case class AB(a:List[Int], b:String)
+  def filter[A, Like[_] : Filter](like:Like[A], predicate:A => Boolean, msg: => String):Like[A] =
+    implicitly[Filter[Like]].filter(like, predicate, msg)
   
-  val demo = wrapper(
-    sequence(field("ab", wrapper(sequence(
-      field("a", array(int)),
-      field("b", string))){case a ~ b => AB(a, b)}{ case AB(a, b) => a ~ b }),
-    option(field("opt", string)))
-  ){ case ab ~ opt => Ex(ab, opt) }{ case Ex(ab, opt) => new ~(ab, opt) }
-  
-  
-  val demo2 = 
-    (("ab" ::
-      (("a" :: int.*) ~
-      ("b" :: string)).wrap(AB)(AB.unapply(_).get)) ~
-    ("opt" :: string).?).wrap(Ex)(Ex.unapply(_).get)
-  
-  val pickled = demo.pickle(Ex(AB(List(1,2,3), "foo"), Some("hello")))
-  val unpickled = demo.unpickle(pickled)
-  
-  println(pickled -> unpickled)
-  
-  val either:JsonValue[AnyVal] = or(int, boolean)
-  
-  println(either.unpickle(either.pickle(1)))
-  println(either.unpickle(either.pickle(true)))
-  
-  string.wrap(_.toInt)(_.toString)
-  
-  val all = Selector.* :: string
-  
+  def enumerated[A, Like[_] : Filter](like:Like[A], values:A*):Like[A] =
+    filter(like, values.contains, "expected one of " + values.mkString("(", ",", ")"))  
 }

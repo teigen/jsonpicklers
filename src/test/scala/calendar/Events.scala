@@ -1,15 +1,12 @@
 package calendar
 
-import jsonpicklers._
+import pickles._
+import syntax._
 
 /*
  * https://developers.google.com/google-apps/calendar/v3/reference/events
  */
 object Events {
-  
-  import tuples._
-  import syntax._
-  
   val etag = string
   val datetime = string
   val date = string
@@ -43,14 +40,14 @@ object Events {
                       comment:Option[String], 
                       additionalGuests:Int)
 
-  val extendedProperties = Wrap(ExtendedProperties)(ExtendedProperties.unapply(_).get)
-  val gadget             = Wrap(Gadget)(Gadget.unapply(_).get)
-  val person             = Wrap(Person)(Person.unapply(_).get)
-  val time               = Wrap(Time)(Time.unapply(_).get)
-  val attendee           = Wrap(Attendee)(Attendee.unapply(_).get)
+  val extendedProperties = wrap(ExtendedProperties)(ExtendedProperties.unapply(_).get)
+  val gadget             = wrap(Gadget)(Gadget.unapply(_).get)
+  val person             = wrap(Person)(Person.unapply(_).get)
+  val time               = wrap(Time)(Time.unapply(_).get)
+  val attendee           = wrap(Attendee)(Attendee.unapply(_).get)
   
   
-  ("kind"                   :: "calendar#event") ~
+  ("kind"                   :: string("calendar#event")) ~
   ("etag"                   :: etag)             ~
   ("id"                     :: string)           ~
   ("status"                 :: string("confirmed", "tentative", "cancelled")).? ~
@@ -84,7 +81,7 @@ object Events {
   ("transparency"           :: string("opaque", "transparent")).? ~
   ("visibility"             :: string("default", "public", "private", "confidential")).? ~
   ("iCalUID"                :: string)           ~
-  ("sequence"               :: integer)          ~    
+  ("sequence"               :: int)          ~    
   ("attendees"              :: array(attendee(
     (("email"               :: string)           ~
     ("displayName"          :: string).?         ~
@@ -94,7 +91,7 @@ object Events {
     ("optional"             :: boolean).?(false) ~
     ("responseStatus"       :: string("needsAction", "declined", "tentative", "accepted")) ~
     ("comment"              :: string).?         ~
-    ("additionalGuests"     :: integer).?(0))))) ~    
+    ("additionalGuests"     :: int).?(0))))) ~    
   ("attendeesOmitted"       :: boolean).?(false) ~    
   ("extendedProperties"     :: extendedProperties(
     ("private"              :: 
@@ -106,8 +103,8 @@ object Events {
     ("title"                :: string)           ~
     ("link"                 :: string)           ~
     ("iconLink"             :: string)           ~
-    ("width"                :: integer).?        ~
-    ("height"               :: integer).?        ~
+    ("width"                :: int).?        ~
+    ("height"               :: int).?        ~
     ("display"              :: string("icon", "chip")).? ~
     ("preferences"          :: 
       (*                    :: string))))        ~        
@@ -119,5 +116,5 @@ object Events {
     ("useDefault"           :: boolean)          ~
     ("overrides"            :: array(
       ("method"             :: string("email", "sms", "popup")) ~
-      ("minutes"            :: integer))))  
+      ("minutes"            :: int))))  
 }

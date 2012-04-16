@@ -2,7 +2,7 @@ package calendar
 
 import org.scalatest.PropSpec
 import net.liftweb.json.JsonParser
-import jsonpicklers._
+import pickles._
 
 class GoogleCalendar extends PropSpec {
   
@@ -35,7 +35,7 @@ class GoogleCalendar extends PropSpec {
     val unpickled = calendarList.unpickle(source)
     val expected = CalendarList("calendar#calendarListEntry","etag","string","string",Some("string"),Some("string"),None,Some("string"),Some("string"),true,false,"freeBusyReader",List(Reminder("email",5)))
     
-    assert(unpickled === Success(expected, Root, source))
+    assert(unpickled === Success(expected, Root(source)))
     
     assert(calendarList.pickle(expected) === source)
   }

@@ -14,7 +14,7 @@ class TwitterTest extends PropSpec {
   property("public_timeline.json"){
     val j = json("public_timeline.json") 
     TimeLine.json.unpickle(j) match {
-      case jsonpicklers.Success(value, _, _) =>
+      case pickles.Success(value, _) =>
       case f => fail(f.toString)
     }
   }
@@ -22,7 +22,7 @@ class TwitterTest extends PropSpec {
   property("public_timeline?include_entities=true.json"){
     val j = json("public_timeline?include_entities=true.json")
     TimeLine.json.unpickle(j) match {
-      case jsonpicklers.Success(value, _, _) =>
+      case pickles.Success(value, _) =>
       case f => fail(f.toString)
     }
   }

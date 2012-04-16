@@ -3,7 +3,7 @@ package collectionjson
 import org.scalatest.PropSpec
 import io.Source
 import net.liftweb.json.JsonParser
-import jsonpicklers._
+import pickles._
 
 class CollectionJsonTest extends PropSpec {
 
@@ -11,7 +11,7 @@ class CollectionJsonTest extends PropSpec {
 
   def json(name: String) = {
     collectionjson.CollectionJson.collection.unpickle(source(name)) match {
-      case Success(_, _, _) =>
+      case Success(_, _) =>
       //      println(s)
 
       case f: Failure => fail(f.toString)

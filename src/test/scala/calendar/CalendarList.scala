@@ -1,13 +1,12 @@
 package calendar
 
-import jsonpicklers._
+import pickles._
 
 /*
  * https://developers.google.com/google-apps/calendar/v3/reference/calendarList
  */
 object CalendarList {
   
-  import tuples._
   import syntax._
   
   val etag = string
@@ -28,11 +27,11 @@ object CalendarList {
   
   case class Reminder(method:String, minutes:Int)
 
-  val wrapCalendarList = Wrap(CalendarList.apply)(CalendarList.unapply(_).get)  
-  val wrapReminder     = Wrap(Reminder)(Reminder.unapply(_).get)
+  val wrapCalendarList = wrap(CalendarList.apply)(CalendarList.unapply(_).get)  
+  val reminder     = wrap(Reminder)(Reminder.unapply(_).get)
 
-  lazy val calendarList = (
-    ("kind"            :: "calendar#calendarListEntry") ~
+  lazy val calendarList = wrapCalendarList(
+    ("kind"            :: string("calendar#calendarListEntry")) ~
     ("etag"            :: etag)   ~
     ("id"              :: string) ~
     ("summary"         :: string) ~
@@ -44,10 +43,9 @@ object CalendarList {
     ("hidden"          :: boolean).?(false) ~
     ("selected"        :: boolean).?(false) ~
     ("accessRole"      :: string("freeBusyReader", "reader", "writer", "owner")) ~
-    ("defaultReminders":: array(    
+    ("defaultReminders":: array(reminder(    
       ("method" :: string("email", "sms", "popup")) ~
-      ("minutes":: integer) as wrapReminder    
+      ("minutes":: int))    
     ))
-  ) as wrapCalendarList
-  
+  )
 }
