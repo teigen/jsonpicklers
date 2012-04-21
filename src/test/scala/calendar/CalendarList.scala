@@ -7,7 +7,7 @@ import pickles._
  */
 object CalendarList {
   
-  import syntax._
+  import flatten._
   
   val etag = string
   
@@ -27,10 +27,7 @@ object CalendarList {
   
   case class Reminder(method:String, minutes:Int)
 
-  val wrapCalendarList = wrap(CalendarList.apply)(CalendarList.unapply(_).get)  
-  val reminder     = wrap(Reminder)(Reminder.unapply(_).get)
-
-  lazy val calendarList = wrapCalendarList(
+  lazy val calendarList = (
     ("kind"            :: string("calendar#calendarListEntry")) ~
     ("etag"            :: etag)   ~
     ("id"              :: string) ~
@@ -43,9 +40,9 @@ object CalendarList {
     ("hidden"          :: boolean).?(false) ~
     ("selected"        :: boolean).?(false) ~
     ("accessRole"      :: string("freeBusyReader", "reader", "writer", "owner")) ~
-    ("defaultReminders":: array(reminder(    
+    ("defaultReminders":: array((    
       ("method" :: string("email", "sms", "popup")) ~
-      ("minutes":: int))    
+      ("minutes":: int)).wrap(Reminder)(Reminder.unapply(_).get)    
     ))
-  )
+  ).wrap(CalendarList.apply)(CalendarList.unapply(_).get)
 }

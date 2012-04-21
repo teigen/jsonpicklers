@@ -1,7 +1,7 @@
 package twitter
 
 import pickles._
-import syntax._
+import flatten._
 
 import java.net.{MalformedURLException, URL}
 
@@ -133,11 +133,11 @@ object Tweet {
     ("id_str"                    :: string) ~
     ("created_at"                :: string) ~
     ("favorited"                 :: boolean) ~
-    ("in_reply_to_screen_name"   :: (string)) ~
-    ("in_reply_to_user_id"       :: (bigint)) ~
-    ("in_reply_to_user_id_str"   :: (string)) ~
-    ("in_reply_to_status_id"     :: (bigint)) ~
-    ("in_reply_to_status_id_str" :: (string)) ~
+    ("in_reply_to_screen_name"   :: (string | NULL)) ~
+    ("in_reply_to_user_id"       :: (bigint | NULL)) ~
+    ("in_reply_to_user_id_str"   :: (string | NULL)) ~
+    ("in_reply_to_status_id"     :: (bigint | NULL)) ~
+    ("in_reply_to_status_id_str" :: (string | NULL)) ~
     ("text"                      :: string) ~
     ("retweet_count"             :: int) ~
     ("truncated"                 :: boolean) ~
@@ -181,7 +181,7 @@ object UserData {
     val json = wrap(apply)(unapply(_).get){
       ("id"          :: bigint ) ~
       ("id_str"      :: string ) ~
-      ("url"         :: url) ~
+      ("url"         :: (url | NULL)) ~
       ("created_at"  :: string ) ~
       ("utc_offset"  :: option(int)) ~
       ("screen_name" :: string ) ~
@@ -251,17 +251,17 @@ case class UserProfile(useBackgroundImage: Boolean,
                        linkColor: String)
 
 object UserFlags {
-  val json = wrap(apply)(unapply(_).get){
+  val json = wrap(apply)(unapply(_).get)(
     ("protected"             :: boolean) ~
     ("geo_enabled"           :: boolean) ~
     ("contributors_enabled"  :: boolean) ~
     ("is_translator"         :: boolean) ~
     ("show_all_inline_media" :: option(boolean)) ~
-    ("notifications"         :: boolean) ~ // box Boolean to allow null value
-    ("follow_request_sent"   :: boolean) ~  // manually wrap null returning false
-    ("following"             :: boolean) ~ // if null return Boolean default value which is false
-    ("verified"              :: boolean) // if null return the value false
-  }
+    ("notifications"         :: (boolean ? false)) ~
+    ("follow_request_sent"   :: (boolean ? false)) ~
+    ("following"             :: (boolean ? false)) ~
+    ("verified"              :: boolean)
+  )
 }
 case class UserFlags(`protected`:Boolean, 
                      geoEnabled:Boolean, 

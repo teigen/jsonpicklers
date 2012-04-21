@@ -1,15 +1,15 @@
 package calendar
 
 import pickles._
-import syntax._
+import flatten._
 
 /*
  * https://developers.google.com/google-apps/calendar/v3/reference/events
  */
 object Events {
-  val etag = string
+  val etag     = string
   val datetime = string
-  val date = string
+  val date     = string
 
   case class Gadget(tpe:String,
                     title:String,

@@ -19,8 +19,6 @@ package object jsonpicklers {
 
   def array[A](a:JsonTypeLike[A]) = JsonType.array[A](a.asType)
 
-  def box[A <: AnyVal, B <: Object, Pickle <: JValue, Like[_]](a:JsonLike[A, Pickle, Like])(implicit ev:Boxable[A, B]) = ev.box(a)
-
   def option[A, Like[_]](self:Optional[A, Like]) = self.?
 
   def property[A](name:String, json:JsonTypeLike[A]) = JsonProperty(name, json.asType)
