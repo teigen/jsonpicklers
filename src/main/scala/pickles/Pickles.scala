@@ -1,6 +1,7 @@
 package pickles
 
 import net.liftweb.json.JsonAST._
+import util.matching.Regex
 
 sealed trait Location {
   def json:JValue
@@ -32,6 +33,13 @@ trait Result[+A]{
     case f:Failure => other
     case n         => n
   }
+  
+  def isFailure = this match {
+    case _:Failure => true
+    case _         => false
+  }
+  
+  def isSuccess = !isFailure
 }
 case class Success[+A](value:A, location:Location) extends Result[A]
 case class Failure(msg:String, location:Location) extends Result[Nothing]{
@@ -47,18 +55,7 @@ trait Pickler[A, Pickle <: JValue]{
   def unpickle(location:Location):Result[A]
 }
 
-trait Syntax[A, Like[_]]{
-  this:Like[A] =>
 
-  def ? (implicit ev:Optional[Like]) = Json.option(this)
-  def ? (orElse: => A)(implicit ev0:Optional[Like], ev1:Wrapper[Like]) = Json.option(this, orElse)
-  def | [T >: A, B <: T](b:Like[B])(implicit ra:Reify[A], rb:Reify[B], or:Or[Like]):Like[T] = Json.or(this, b)
-  def wrap[B](w:A => B)(u:B => A)(implicit ev:Wrapper[Like]) = ev.wrap(this, w, u)
-  def apply(values:A*)(implicit ev:Filter[Like]) = Json.enumerated(this, values:_*)
-  def :: (name:String)(implicit ev:Like[A] => JsonValue[A]) = Json.property(name, this)
-  def :: (selector:Selector)(implicit ev:Like[A] => JsonValue[A]) = Json.select(selector.filter, this)
-  def ~[B] (other:JsonObject[B])(implicit ev:Like[A] => JsonObject[A]) = Json.sequence(this, other)
-}
 
 trait JsonValue[A] extends Pickler[A, JValue] with Syntax[A, JsonValue]{
   def unpickle(json:JValue):Result[A] = unpickle(Root(json)) match {
@@ -66,6 +63,7 @@ trait JsonValue[A] extends Pickler[A, JValue] with Syntax[A, JsonValue]{
     case n => n
   }
 }
+
 object JsonProperty{
   implicit def asObject[A](field:JsonProperty[A]) = new JsonObject[A]{
     def pickle(a: A) = field.pickle(a)
@@ -91,10 +89,33 @@ object JsonObject {
 }
 trait JsonObject[A] extends Pickler[A, JObject] with Syntax[A, JsonObject]
 
+trait ArrayOf[Like[_]]{
+  def array[A](like:Like[A]):Like[List[A]]
+}
+
+object ArrayOf{
+  def apply[Like[_] : ArrayOf] = implicitly[ArrayOf[Like]]
+  
+  implicit val jsonValue = new ArrayOf[JsonValue]{
+    def array[A](value:JsonValue[A]):JsonValue[List[A]] = new JsonValue[List[A]] {
+      def pickle(a: List[A]) = JArray(a.map(value.pickle))
+      def unpickle(location:Location) = location.json match {
+        case JArray(values) => List.range(0, values.size).foldRight[Result[List[A]]](Success(Nil, location)){
+          case (index, lst) => for{
+            u    <- value.unpickle(location(index))
+            tail <- lst
+          } yield u :: tail
+        }
+        case _ => Failure("expected array", location)
+      }
+    }
+  }  
+}
+
 trait Optional[Like[_]]{
   def optional[A](like:Like[A]):Like[Option[A]]
   def optional[A](like:Like[A], orElse: => A)(implicit ev:Wrapper[Like]):Like[A] =
-    ev.wrap[Option[A], A](optional(like), _.getOrElse(orElse), Some(_))
+    ev.wrap[Option[A], A](optional(like))(_.getOrElse(orElse))(Some(_))
 }
 
 object Optional{
@@ -122,26 +143,26 @@ object Optional{
 }
 
 trait Wrapper[Like[_]]{
-  def wrap[A, B](like:Like[A], w:A => B, u:B => A):Like[B]
+  def wrap[A, B](like:Like[A])(w:A => B)(u:B => A):Like[B]
 }
 
 object Wrapper{
   def apply[A[_] : Wrapper] = implicitly[Wrapper[A]]
   
   implicit val wrapObject = new Wrapper[JsonObject]{
-    def wrap[A, B](like: JsonObject[A], w: (A) => B, u: (B) => A) = new JsonObject[B]{
+    def wrap[A, B](like: JsonObject[A])(w: (A) => B)(u: (B) => A) = new JsonObject[B]{
       def pickle(b: B) = like.pickle(u(b))
       def unpickle(location:Location) = like.unpickle(location).map(w)
     }
   }
   implicit val wrapValue = new Wrapper[JsonValue]{
-    def wrap[A, B](like: JsonValue[A], w: (A) => B, u: (B) => A) = new JsonValue[B]{
+    def wrap[A, B](like: JsonValue[A])(w: (A) => B)(u: (B) => A) = new JsonValue[B]{
       def pickle(b: B) = like.pickle(u(b))
       def unpickle(location:Location) = like.unpickle(location).map(w)
     }
   }
   implicit val wrapField = new Wrapper[JsonProperty]{
-    def wrap[A, B](like: JsonProperty[A], w: (A) => B, u: (B) => A) = JsonProperty(like.name, Wrapper[JsonValue].wrap(like.value, w, u))
+    def wrap[A, B](like: JsonProperty[A])(w: (A) => B)(u: (B) => A) = JsonProperty(like.name, Wrapper[JsonValue].wrap(like.value)(w)(u))
   }
 }
 
@@ -185,26 +206,26 @@ object Reify{
 }
 
 trait Filter[Like[_]]{
-  def filter[A](value:Like[A], predicate:A => Boolean, msg: => String):Like[A]
+  def filter[A](value:Like[A])(predicate:A => Boolean, msg: => String):Like[A]
 }
 
 object Filter {
   def apply[A[_] : Filter] = implicitly[Filter[A]]
   
   implicit val jsonValue = new Filter[JsonValue]{
-    def filter[A](value: JsonValue[A], predicate: (A) => Boolean, msg: => String) = new JsonValue[A]{
+    def filter[A](value: JsonValue[A])(predicate: (A) => Boolean, msg: => String) = new JsonValue[A]{
       def pickle(a: A) = if(predicate(a)) value.pickle(a) else sys.error(msg) 
       def unpickle(location: Location) = value.unpickle(location).flatMap(v => if(predicate(v)) Success(v, location) else Failure(msg, location))
     }
   }
   implicit val jsonObject = new Filter[JsonObject]{
-    def filter[A](value: JsonObject[A], predicate: (A) => Boolean, msg: => String) = new JsonObject[A]{
+    def filter[A](value: JsonObject[A])(predicate: (A) => Boolean, msg: => String) = new JsonObject[A]{
       def pickle(a: A) = if(predicate(a)) value.pickle(a) else sys.error(msg)
       def unpickle(location: Location) = value.unpickle(location).flatMap(v => if(predicate(v)) Success(v, location) else Failure(msg, location))
     }
   }
   implicit val jsonField = new Filter[JsonProperty]{
-    def filter[A](field: JsonProperty[A], predicate: (A) => Boolean, msg: => String) = JsonProperty(field.name, Json.filter(field.value)(predicate, msg))
+    def filter[A](field: JsonProperty[A])(predicate: (A) => Boolean, msg: => String) = JsonProperty(field.name, Json.filter(field.value)(predicate, msg))
   }
 }
 
@@ -220,6 +241,32 @@ object Selector {
   implicit def filter(f:String => Boolean) = new Selector{
     def filter(name:String) = f(name)
   }
+  
+  implicit def regex(r:Regex) = new Selector{
+    def filter(name: String) = r.pattern.matcher(name).matches()
+  }
+}
+
+trait Syntax[A, Like[_]]{
+  this:Like[A] =>
+
+  def ? (implicit opt:Optional[Like]) = opt.optional(this)
+  def ? (orElse: => A)(implicit opt:Optional[Like], wrapper:Wrapper[Like]):Like[A] = opt.optional(this, orElse)
+  def | [T >: A, B <: T](b:Like[B])(implicit ra:Reify[A], rb:Reify[B], or:Or[Like]):Like[T] = Json.or(this, b)
+  def wrap[B](w:A => B)(u:B => A)(implicit ev:Wrapper[Like]) = ev.wrap(this)(w)(u)
+  def apply(values:A*)(implicit ev:Filter[Like]) = Json.enumerated(this, values:_*)
+  def :: (name:String)(implicit ev:Like[A] => JsonValue[A]) = Json.property(name, this)
+  def :: (selector:Selector)(implicit ev:Like[A] => JsonValue[A]) = Json.select(selector.filter, this)
+  def ~[B] (other:JsonObject[B])(implicit ev:Like[A] => JsonObject[A]) = Json.sequence(this, other)
+  def * (implicit ev:Like[A] => JsonValue[A]) = ArrayOf[JsonValue].array(this)
+  
+  def filter(predicate:A => Boolean, msg:String)(implicit ev:Filter[Like]):Like[A] = Filter[Like].filter(this)(predicate, msg)
+
+  //ordering
+  def <  (rhs:A)(implicit ev:Filter[Like], ordering:Ordering[A]) = Filter[Like].filter(this)(a => ordering.lt(a, rhs),   "expected value < "  + rhs)
+  def <= (rhs:A)(implicit ev:Filter[Like], ordering:Ordering[A]) = Filter[Like].filter(this)(a => ordering.lteq(a, rhs), "expected value <= " + rhs)
+  def >  (rhs:A)(implicit ev:Filter[Like], ordering:Ordering[A]) = Filter[Like].filter(this)(a => ordering.gt(a, rhs),   "expected value > "  + rhs)
+  def >= (rhs:A)(implicit ev:Filter[Like], ordering:Ordering[A]) = Filter[Like].filter(this)(a => ordering.gteq(a, rhs), "expected value >= " + rhs)
 }
 
 trait TildeSyntaxes {
@@ -288,6 +335,7 @@ object Json {
   
   val string  = primitive("string"){ case JString(s) => s }(JString(_))
   val int     = primitive("int"){ case JInt(i) => i.intValue() }(JInt(_))
+  val double  = primitive("double"){ case JDouble(d) => d }(JDouble(_))
   val bigint  = primitive("bigint"){ case JInt(i) => i }(JInt(_))
   val boolean = primitive("boolean"){ case JBool(b) => b}(JBool(_))
   val NULL    = new JsonValue[Null]{
@@ -299,18 +347,7 @@ object Json {
     def apply[B](value:B):JsonValue[B] = wrap(_ => value)(_ => null)
   }
   
-  def array[A](value:JsonValue[A]):JsonValue[List[A]] = new JsonValue[List[A]] {
-    def pickle(a: List[A]) = JArray(a.map(value.pickle))
-    def unpickle(location:Location) = location.json match {
-      case JArray(values) => List.range(0, values.size).foldRight[Result[List[A]]](Success(Nil, location)){
-        case (index, lst) => for{
-          u <- value.unpickle(location(index))
-          tail <- lst
-        } yield u :: tail
-      }
-      case _ => Failure("expected array", location)
-    }
-  }
+  
   
   def property[A](name:String, value:JsonValue[A]) = JsonProperty(name, value)
   
@@ -326,19 +363,19 @@ object Json {
     }
   }
   
-  def option[A, Like[_] : Optional](like:Like[A]):Like[Option[A]] = 
-    Optional[Like].optional(like)
-  
-  def option[A, Like[_] : Optional : Wrapper](like:Like[A], orElse: => A) =
-    Optional[Like].optional(like, orElse)
+//  def option[A, Like[_] : Optional](like:Like[A]):Like[Option[A]] = 
+//    Optional[Like].optional(like)
+//  
+//  def option[A, Like[_] : Optional : Wrapper](like:Like[A], orElse: => A) =
+//    Optional[Like].optional(like, orElse)
   
   def or[T, A <: T : Reify, B <: T : Reify, Like[_] : Or](a:Like[A], b:Like[B]):Like[T] = 
     Or[Like].or(a, b)  
   
-  def select[A](filter:String => Boolean, value:JsonValue[A]):JsonValue[Map[String, A]] = new JsonValue[Map[String, A]] {
+  def select[A](f:String => Boolean, value:JsonValue[A]):JsonValue[Map[String, A]] = new JsonValue[Map[String, A]] {
     def unpickle(location:Location) = location.json match {
       case JObject(fields) => 
-        fields.filter(field => filter(field.name)).foldLeft[Result[Map[String, A]]](Success(Map.empty, location)){
+        fields.filter(field => f(field.name)).foldLeft[Result[Map[String, A]]](Success(Map.empty, location)){
           (map, field) => for{
             m <- map
             v <- value.unpickle(location(field.name))
@@ -351,7 +388,7 @@ object Json {
   }
   
   def filter[A, Like[_] : Filter](like:Like[A])(predicate:A => Boolean, msg: => String):Like[A] =
-    Filter[Like].filter(like, predicate, msg)
+    Filter[Like].filter(like)(predicate, msg)
   
   def enumerated[A, Like[_] : Filter](like:Like[A], values:A*):Like[A] =
     filter(like)(values.contains, "expected one of " + values.mkString("(", ",", ")"))  

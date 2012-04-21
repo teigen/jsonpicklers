@@ -29,7 +29,8 @@ import Types._
 
 object Entities {
   val json = wrap(apply)(unapply(_).get){
-    ("urls" :: array(TweetURL.json)) ~
+//    ("urls" :: array(TweetURL.json)) ~
+    ("urls" :: TweetURL.json.*) ~
     ("user_mentions" :: array(UserMention.json)) ~
     ("hashtags" :: array(HashTag.json)) ~
     ("media" :: array(Media.json)).?(Nil)
