@@ -4,8 +4,6 @@ import org.scalatest.PropSpec
 import net.liftweb.json.JsonParser
 import net.liftweb.json.JsonAST._
 
-import flatten._
-
 class OrTest extends PropSpec {
 
   property("or") {
@@ -18,10 +16,10 @@ class OrTest extends PropSpec {
     val wrapIntValue = wrap(IntValue)(IntValue.unapply(_).get)
     val wrapTwoValues = wrap(TwoValues)(TwoValues.unapply(_).get)
 
-    implicit val reifyIntValue = Reify pf {
+    implicit val reifyIntValue = Reify {
       case i: IntValue => i
     }
-    implicit val reifyStringValue = Reify pf {
+    implicit val reifyStringValue = Reify {
       case s: StringValue => s
     }
 

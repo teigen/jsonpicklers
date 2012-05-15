@@ -8,8 +8,6 @@ version := "0.1"
 
 libraryDependencies += "net.liftweb" %% "lift-json" % "2.4"
 
-libraryDependencies += "net.databinder" %% "dispatch-json" % "0.8.8"
-
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.7.1" % "test"
 
 libraryDependencies += "org.scala-tools.testing" %% "scalacheck" % "1.9" % "test"

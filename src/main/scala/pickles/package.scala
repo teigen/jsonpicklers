@@ -1,26 +1,41 @@
-package object pickles {
+import net.liftweb.json.JsonAST._
+
+package object pickles extends FlattenTilde {
   val  * = Selector.*
-  
-  val string   = Json.string
-  val int      = Json.int
-  val double   = Json.double
-  val bigint   = Json.bigint
-  val boolean  = Json.boolean
-  val NULL     = Json.NULL
-  
-  val tilde   = Json.tilde
-  val flatten = Json.flatten
-  
-  def array[A, Like[_]](value:Syntax[A, Like])(implicit ev:Like[A] => JsonValue[A]) = value.*
-  def property[A](name:String, value:JsonValue[A]) = Json.property(name, value)
-  def sequence[A, B](a:JsonObject[A], b:JsonObject[B]) = Json.sequence(a, b)
-  def wrap[A, B](w:A => B)(u:B => A) = new Wrap(w, u)
-  def option[A, Like[_] : Optional](value:Syntax[A, Like]) = value.?
-  def getOrElse[A, Like[_] : Optional : Wrapper](value:Syntax[A, Like], orElse: => A) = value.?(orElse)
-  def or[T, A <: T : Reify, B <: T : Reify, Like[_] : Or](a:Like[A], b:Like[B]) = Json.or(a, b)
-  def select[A](filter:String => Boolean, value:JsonValue[A]) = Json.select(filter, value)
-  
-  class Wrap[A, B](a:A => B, b:B => A){
-    def apply[Like[_] : Wrapper](like:Like[A]):Like[B] = Wrapper[Like].wrap(like)(a)(b)
+
+  val string  = JsonValue("string"){ case JString(s) => s }(JString(_))
+  val int     = JsonValue("int"){ case JInt(i) => i.intValue() }(JInt(_))
+  val double  = JsonValue("double"){ case JDouble(d) => d }(JDouble(_))
+  val bigint  = JsonValue("bigint"){ case JInt(i) => i }(JInt(_))
+  val boolean = JsonValue("boolean"){ case JBool(b) => b}(JBool(_))
+  val NULL    = new JsonValue[Null]{
+    def pickle(a: Null) = JNull
+    def unpickle(location: Location) = location.json match {
+      case JNull => Success(null, location)
+      case _ => Failure("expected null", location)
+    }
+    def apply[B](value:B):JsonValue[B] = wrap(_ => value)(_ => null)
   }
+  
+  object tilde extends TildeSyntax
+  
+  def array[A](value:JsonValue[A]) = value.*
+  def property[A](name:String, value:JsonValue[A]) = JsonProperty(name, value)
+  def wrap[A, B](w:A => B)(u:B => A) = new Wrapper(w, u)
+  def option[A, Like[_] : Optional](value:Like[A]):Like[Option[A]] = Optional[Like].optional(value)
+  def getOrElse[A, Like[_] : Optional : Wrap](value:Like[A], orElse: => A):Like[A] = Wrap[Like].wrap(Optional[Like].optional(value))(_.getOrElse(orElse))(Some(_))
+  def select[A](filter:String => Boolean, value:JsonValue[A]) = Selector.filter(filter) :: value
+  def or[T, A <: T : Reify, B <: T : Reify, Like[_] : Or](a:Like[A], b:Like[B]):Like[T] = Or[Like].or(a, b)
+  
+  class Wrapper[A, B](a:A => B, b:B => A){
+    def apply[Like[_] : Wrap](like:Like[A]):Like[B] = Wrap[Like].wrap(like)(a)(b)
+  }
+  
+  def either[A : Reify, B : Reify, Like[_] : Or : Wrap](a:Like[A], b:Like[B]):Like[Either[A, B]] = {
+    val left  = Wrap[Like].wrap(a)(Left(_))(_.a)
+    val right = Wrap[Like].wrap(b)(Right(_))(_.b)
+    or(left, right)
+  }
+  
+  def unique[A](values:JsonValue[List[A]]) = values.filter(v => v.distinct == v, "expected all elements to be unique")
 }

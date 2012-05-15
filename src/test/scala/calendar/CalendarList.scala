@@ -7,8 +7,6 @@ import pickles._
  */
 object CalendarList {
   
-  import flatten._
-  
   val etag = string
   
   case class CalendarList(kind:String,

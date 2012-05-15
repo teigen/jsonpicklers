@@ -1,7 +1,6 @@
 package twitter
 
 import pickles._
-import flatten._
 
 import java.net.{MalformedURLException, URL}
 
@@ -20,7 +19,7 @@ object Types {
     }
   }
   
-  implicit val reifyURL = Reify.pf{
+  implicit val reifyURL = Reify{
     case url:URL => url
   }
 }
@@ -29,7 +28,6 @@ import Types._
 
 object Entities {
   val json = wrap(apply)(unapply(_).get){
-//    ("urls" :: array(TweetURL.json)) ~
     ("urls" :: TweetURL.json.*) ~
     ("user_mentions" :: array(UserMention.json)) ~
     ("hashtags" :: array(HashTag.json)) ~
@@ -171,10 +169,12 @@ case class Tweet(id: BigInt,
 
 object User {
   val json = wrap(apply)(unapply(_).get){
+    // Need to chop chop! (22)
     UserData.json ~ UserCount.json ~ UserProfile.json ~ UserFlags.json
   } 
 }
 
+// Need to chop chop! (22)
 case class User(data:UserData, count:UserCount, profile:UserProfile, flags:UserFlags)
 
 

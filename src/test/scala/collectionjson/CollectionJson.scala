@@ -2,7 +2,6 @@ package collectionjson
 
 import java.net.{URISyntaxException, URI}
 import pickles._
-import flatten._
 
 object CollectionJson {
 
