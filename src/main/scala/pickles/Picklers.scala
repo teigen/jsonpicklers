@@ -11,14 +11,13 @@ object Picklers extends FlattenTilde {
   val bigint  = JsonValue("bigint"){ case JInt(i) => i }(JInt(_))
   val boolean = JsonValue("boolean"){ case JBool(b) => b}(JBool(_))
   val NULL    = {
-    def pickle(a: Null) = JNull
     def unpickle = Parser{ location => 
       location.json match {
         case JNull => Success(null, location)
         case _     => Failure("expected null", location)
       }
     }
-    new JsonValue[Null](unpickle, a => Some(pickle(a))){
+    new JsonValue[Null](unpickle, _ => Some(JNull)){
       def apply[B](value:B):JsonValue[B] = wrap(_ => value)(_ => null)
     }
   }

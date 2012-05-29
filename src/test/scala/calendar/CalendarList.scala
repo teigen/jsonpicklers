@@ -8,8 +8,9 @@ import Picklers._
  */
 object CalendarList {
   
-  val etag = string
-  
+  object CalendarList{
+    val json = wrap(apply)(unapply(_).get)
+  }
   case class CalendarList(kind:String,
                           etag:String, 
                           id:String, 
@@ -24,11 +25,14 @@ object CalendarList {
                           accessRole:String, 
                           defaultReminders:List[Reminder])
   
+  object Reminder {
+    val json = wrap(apply)(unapply(_).get)
+  }
   case class Reminder(method:String, minutes:Int)
 
   lazy val calendarList = (
     ("kind"            :: string("calendar#calendarListEntry")) ~
-    ("etag"            :: etag)   ~
+    ("etag"            :: string)   ~
     ("id"              :: string) ~
     ("summary"         :: string) ~
     ("description"     :: string).? ~
@@ -41,7 +45,7 @@ object CalendarList {
     ("accessRole"      :: string("freeBusyReader", "reader", "writer", "owner")) ~
     ("defaultReminders":: array((    
       ("method" :: string("email", "sms", "popup")) ~
-      ("minutes":: int)).wrap(Reminder)(Reminder.unapply(_).get)    
+      ("minutes":: int)) ^^ Reminder.json
     ))
-  ).wrap(CalendarList.apply)(CalendarList.unapply(_).get)
+  ) ^^ CalendarList.json
 }
