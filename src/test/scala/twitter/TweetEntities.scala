@@ -1,14 +1,15 @@
 package twitter
 
 import pickles._
+import Picklers._
 
 import java.net.{MalformedURLException, URL}
 
 object Types {
-  val url = new JsonValue[URL]{
+  val url = {
     def noProtocol(s:String) = "no protocol:.*".r.pattern.matcher(s).matches()
     def pickle(a: URL) = string.pickle(a.toString)
-    def unpickle(location:Location):Result[URL] = {
+    def unpickle = Parser{ location =>
       def un(s:String, location:Location):Result[URL] = try{
         Success(new URL(s), location)
       } catch {
@@ -17,21 +18,18 @@ object Types {
       }      
       string.unpickle(location).flatMap{ s => un(s, location) }
     }
-  }
-  
-  implicit val reifyURL = Reify{
-    case url:URL => url
-  }
+    JsonValue(unpickle, pickle)
+  }  
 }
 
 import Types._
 
 object Entities {
   val json = wrap(apply)(unapply(_).get){
-    ("urls" :: TweetURL.json.*) ~
+    ("urls"          :: TweetURL.json.*) ~
     ("user_mentions" :: array(UserMention.json)) ~
-    ("hashtags" :: array(HashTag.json)) ~
-    ("media" :: array(Media.json)).?(Nil)
+    ("hashtags"      :: array(HashTag.json)) ~
+    ("media"         :: array(Media.json)).?(Nil)
   } 
 }
 

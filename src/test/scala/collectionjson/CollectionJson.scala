@@ -2,6 +2,7 @@ package collectionjson
 
 import java.net.{URISyntaxException, URI}
 import pickles._
+import Picklers._
 
 object CollectionJson {
 
@@ -76,14 +77,16 @@ object CollectionJson {
   lazy val value   = "value"   :: string
   lazy val version = "version" :: string
 
-  val uri = new JsonValue[URI]{
+  val uri = {
     def pickle(a: URI) = string.pickle(a.toString)
-    def unpickle(location: Location) = string.unpickle(location).flatMap{ s =>
+    def unpickle = Parser{ location => string.unpickle(location).flatMap{ s =>
       try{
         Success(new URI(s), location)
       } catch {
         case ex:URISyntaxException => Failure(ex.getMessage, location)
       }
     }
+    }
+    JsonValue(unpickle, pickle)
   }
 }

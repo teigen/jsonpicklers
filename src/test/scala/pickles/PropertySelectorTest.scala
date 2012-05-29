@@ -1,5 +1,7 @@
 package pickles
 
+import Picklers._
+
 import org.scalatest.PropSpec
 import net.liftweb.json.JsonParser
 
@@ -20,11 +22,11 @@ class PropertySelectorTest extends PropSpec {
     val fields = "fields" ::
       (* :: string)
 
-    val unpickled = fields.unpickle(json)
+    val unpickled = fields.unpickle(json).get
 
     val expected = Map("a" -> "Hello", "b" -> "World")
 
-    assert(unpickled === Success(expected, Root(json)))
+    assert(unpickled === expected)
     assert(fields.pickle(expected) === json)
   }
 
@@ -42,11 +44,11 @@ class PropertySelectorTest extends PropSpec {
     val fields = "fields" ::
       * :: (string | int)
 
-    val unpickled = fields.unpickle(json)
+    val unpickled = fields.unpickle(json).get
 
     val expected = Map("a" -> "Hello", "b" -> 5)
 
-    assert(unpickled === Success(expected, Root(json)))
+    assert(unpickled === expected)
     assert(fields.pickle(expected) === json)
   }
 
@@ -66,10 +68,10 @@ class PropertySelectorTest extends PropSpec {
     val fields = "fields" ::
       "\\d".r :: int
 
-    val unpickled = fields.unpickle(json)
+    val unpickled = fields.unpickle(json).get
 
     val expected = Map("1" -> 1, "2" -> 2)
 
-    assert(unpickled === Success(expected, Root(json)))
+    assert(unpickled === expected)
   }
 }

@@ -1,6 +1,7 @@
 package calendar
 
 import pickles._
+import Picklers._
 
 /*
  * https://developers.google.com/google-apps/calendar/v3/reference/calendarList

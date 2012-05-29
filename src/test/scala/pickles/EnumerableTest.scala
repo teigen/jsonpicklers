@@ -1,5 +1,7 @@
 package pickles
 
+import Picklers._
+
 import org.scalatest.PropSpec
 import net.liftweb.json.JsonAST._
 
@@ -10,9 +12,9 @@ class EnumerableTest extends PropSpec {
 
     val json = JObject(List(JField("a", JString("b"))))
 
-    val unpickled = field.unpickle(json)
+    val unpickled = field.unpickle(json).get
 
-    assert(unpickled === Success("b", Root(json)))
+    assert(unpickled === "b")
 
     assert(field.pickle("b") == json)
   }
@@ -35,9 +37,9 @@ class EnumerableTest extends PropSpec {
 
     val json = JObject(List(JField("a", JString("b"))))
 
-    val unpickled = field.unpickle(json)
+    val unpickled = field.unpickle(json).get
 
-    assert(unpickled === Success("b", Root(json)))
+    assert(unpickled === "b")
     assert(field.pickle("b") === json)
   }
 

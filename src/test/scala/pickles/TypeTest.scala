@@ -1,10 +1,11 @@
 package pickles
 
+import Picklers._
+
 import org.scalatest.PropSpec
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import net.liftweb.json.JsonAST._
 import org.scalacheck.Arbitrary.arbitrary
-import org.scalacheck.Arbitrary
 
 class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   
@@ -13,7 +14,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   property("string") {
     forAll {
       s: String =>
-        assert(string.unpickle(JString(s)) === Success(s, Root(JString(s))))
+        assert(string.unpickle(JString(s)).get === s)
         assert(string.pickle(s) === JString(s))
     }
   }
@@ -21,7 +22,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   property("boolean") {
     forAll {
       b: Boolean =>
-        assert(boolean.unpickle(JBool(b)) === Success(b, Root(JBool(b))))
+        assert(boolean.unpickle(JBool(b)).get === b)
         assert(boolean.pickle(b) === JBool(b))
     }
   }
@@ -29,7 +30,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   property("double") {
     forAll {
       d: Double =>
-        assert(double.unpickle(JDouble(d)) === Success(d, Root(JDouble(d))))
+        assert(double.unpickle(JDouble(d)).get === d)
         assert(double.pickle(d) === JDouble(d))
     }
   }
@@ -37,20 +38,20 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   property("int") {
     forAll {
       i: Int =>
-        assert(int.unpickle(JInt(i)) === Success(i, Root(JInt(i))))
+        assert(int.unpickle(JInt(i)).get === i)
         assert(int.pickle(i) === JInt(i))
     }
   }
 
   property("null") {
-    assert(NULL.unpickle(JNull) === Success(null, Root(JNull)))
+    assert(NULL.unpickle(JNull).isSuccess)
     assert(NULL.pickle(null) === JNull)
   }
 
   property("bigint") {
     forAll {
       b: BigInt =>
-        assert(bigint.unpickle(JInt(b)) === Success(b, Root(JInt(b))))
+        assert(bigint.unpickle(JInt(b)).get === b)
         assert(bigint.pickle(b) == JInt(b))
     }
   }
@@ -60,7 +61,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
       (name, value) =>
         val json = JObject(List(JField(name, JInt(value))))
         val field = name :: int
-        assert(field.unpickle(json) === Success(value, Root(json)))
+        assert(field.unpickle(json).get === value)
         assert(field.pickle(value) === json)
     }
   }
@@ -79,7 +80,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
         val json = JObject(List(JField(aName, JInt(aVal)), JField(bName, JInt(bVal))))
         val seq = (aName :: int) ~ (bName :: int)
         val vals = new ~(aVal, bVal)
-        assert(seq.unpickle(json) === Success(vals, Root(json)))
+        assert(seq.unpickle(json).get === vals)
         assert(seq.pickle(vals) === json)
     }
   }
@@ -89,7 +90,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
       (name, value) =>
         val json = JObject(value.map(value => JField(name, JInt(value))).toList)
         val field = option(name :: int)
-        assert(field.unpickle(json) === Success(value, Root(json)))
+        assert(field.unpickle(json).get === value)
         assert(field.pickle(value) === json)
     }
   }
@@ -104,7 +105,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
         case None => assert(pickled === JNull)
       }
       
-      assert(value.unpickle(pickled) === Success(opt, Root(pickled)))
+      assert(value.unpickle(pickled).get === opt)
     }
   }
 
@@ -113,7 +114,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
       list: List[Int] =>
         val json = JArray(list.map(JInt(_)))
 
-        assert(array(int).unpickle(json) === Success(list, Root(json)))
+        assert(array(int).unpickle(json).get === list)
         assert(array(int).pickle(list) === json)
     }
   }
@@ -127,7 +128,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
       s:String =>                
         val pickled = value.pickle(Value(s))
         assert(pickled === JString(s))
-        assert(value.unpickle(pickled) === Success(Value(s), Root(pickled)))
+        assert(value.unpickle(pickled).get === Value(s))
     }
   }
   
@@ -155,7 +156,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
           JField("d", JBool(d)),
           JField("e", JDouble(e))))))))
       
-      assert(value.unpickle(pickled) === Success(v, Root(pickled)))
+      assert(value.unpickle(pickled).get === v)
     }
   }
   
@@ -169,7 +170,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
         case Right(value) => assert(pickled === JInt(value))
       }
       
-      assert(or.unpickle(pickled) === Success(e, Root(pickled)))
+      assert(or.unpickle(pickled).get === e)
     }
   }
   

@@ -1,5 +1,7 @@
 package pickles
 
+import Picklers._
+
 import net.liftweb.json.JsonAST.{JField, JObject, JInt}
 import org.scalacheck._
 import org.scalacheck.Prop._

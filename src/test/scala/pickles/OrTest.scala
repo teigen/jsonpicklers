@@ -1,10 +1,26 @@
 package pickles
 
+import Picklers._
+
 import org.scalatest.PropSpec
 import net.liftweb.json.JsonParser
 import net.liftweb.json.JsonAST._
+import org.scalatest.prop.GeneratorDrivenPropertyChecks
 
-class OrTest extends PropSpec {
+class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
+  
+  property("or - multiple"){
+    forAll{ (i:Int, s:String, d:Double, r:Int) =>
+      val element = int | string | double
+      val value = math.abs(r % 3) match {
+        case 0 => i
+        case 1 => s
+        case 2 => d 
+      }
+      val pickled = element.pickle(value)
+      assert(element.unpickle(pickled).get === value)
+    }
+  }
 
   property("or") {
     sealed trait Value
@@ -13,38 +29,29 @@ class OrTest extends PropSpec {
     case class TwoValues(a: Value, b: Value)
 
     val wrapStringValue = wrap(StringValue)(StringValue.unapply(_).get)
-    val wrapIntValue = wrap(IntValue)(IntValue.unapply(_).get)
-    val wrapTwoValues = wrap(TwoValues)(TwoValues.unapply(_).get)
+    val wrapIntValue    = wrap(IntValue)(IntValue.unapply(_).get)
+    val wrapTwoValues   = wrap(TwoValues)(TwoValues.unapply(_).get)
 
-    implicit val reifyIntValue = Reify {
-      case i: IntValue => i
-    }
-    implicit val reifyStringValue = Reify {
-      case s: StringValue => s
-    }
-
-    val stringValue = wrapStringValue(string)
-    val intValue = wrapIntValue(int)
+    val stringValue = string ^^ wrapStringValue
+    val intValue    = int    ^^ wrapIntValue
     val value: JsonValue[Value] = stringValue | intValue
     val a = "a" :: value
     val b = "b" :: value
 
-    val test = wrapTwoValues(a ~ b)
+    val test = a ~ b ^^ wrapTwoValues
 
     val input = JsonParser.parse("""{"a":1, "b":"Hello"}""")
     val unpickled: Result[TwoValues] = test.unpickle(input)
+    
+    val expected = TwoValues(IntValue(1), StringValue("Hello"))
 
-    unpickled match {
-      case Success(s, _) =>
-        assert(s === TwoValues(IntValue(1), StringValue("Hello")))
-        assert(test.pickle(s) === input)
-      case f => fail(f.toString)
-    }
+    assert(unpickled.get === expected)
+    assert(test.pickle(expected) === input)
   }
 
   property("default values and or-else") {
     val field = ("bool" :: boolean).?(false)
-    assert(field.unpickle(JObject(Nil)) === Success(false, Root(JObject(Nil))))
+    assert(field.unpickle(JObject(Nil)).get === false)
     assert(field.pickle(true) === JObject(List(JField("bool", JBool(true)))))
     assert(field.pickle(false) === JObject(List(JField("bool", JBool(false)))))
   }

@@ -32,10 +32,10 @@ class GoogleCalendar extends PropSpec {
 }
 """)
     
-    val unpickled = calendarList.unpickle(source)
+    val unpickled = calendarList.unpickle(source).get
     val expected = CalendarList("calendar#calendarListEntry","etag","string","string",Some("string"),Some("string"),None,Some("string"),Some("string"),true,false,"freeBusyReader",List(Reminder("email",5)))
     
-    assert(unpickled === Success(expected, Root(source)))
+    assert(unpickled === expected)
     
     assert(calendarList.pickle(expected) === source)
   }
