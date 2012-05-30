@@ -78,15 +78,16 @@ object CollectionJson {
   lazy val version = "version" :: string
 
   val uri = {
-    def pickle(a: URI) = string.pickle(a.toString)
-    def unpickle = Parser{ location => string.unpickle(location).flatMap{ s =>
-      try{
-        Success(new URI(s), location)
-      } catch {
-        case ex:URISyntaxException => Failure(ex.getMessage, location)
+    def tryPickle(a: URI) = string.tryPickle(a.toString)
+    def unpickle = Parser{ location => 
+      string.unpickle(location).flatMap{ s =>
+        try{
+          Success(new URI(s), location)
+        } catch {
+          case ex:URISyntaxException => Failure(ex.getMessage, location)
+        }
       }
     }
-    }
-    JsonValue(unpickle, pickle)
+    JsonValue(unpickle, tryPickle)
   }
 }

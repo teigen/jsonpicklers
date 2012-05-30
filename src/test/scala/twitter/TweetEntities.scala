@@ -8,7 +8,7 @@ import java.net.{MalformedURLException, URL}
 object Types {
   val url = {
     def noProtocol(s:String) = "no protocol:.*".r.pattern.matcher(s).matches()
-    def pickle(a: URL) = string.pickle(a.toString)
+    def tryPickle(a: URL) = string.tryPickle(a.toString)
     def unpickle = Parser{ location =>
       def un(s:String, location:Location):Result[URL] = try{
         Success(new URL(s), location)
@@ -18,7 +18,7 @@ object Types {
       }      
       string.unpickle(location).flatMap{ s => un(s, location) }
     }
-    JsonValue(unpickle, pickle)
+    JsonValue(unpickle, tryPickle)
   }  
 }
 
