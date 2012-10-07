@@ -3,7 +3,7 @@ package collectionjson
 import org.scalatest.PropSpec
 import io.Source
 import net.liftweb.json.JsonParser
-import pickles._
+import jsonpicklers._
 
 class CollectionJsonTest extends PropSpec {
 

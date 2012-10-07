@@ -1,4 +1,4 @@
-package pickles
+package jsonpicklers
 
 import util.matching.Regex
 

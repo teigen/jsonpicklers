@@ -1,6 +1,6 @@
 package twitter
 
-import pickles._
+import jsonpicklers._
 import Picklers._
 
 import java.net.{MalformedURLException, URL}

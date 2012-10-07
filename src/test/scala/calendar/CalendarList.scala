@@ -1,6 +1,6 @@
 package calendar
 
-import pickles._
+import jsonpicklers._
 import Picklers._
 
 /*

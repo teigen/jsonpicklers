@@ -2,7 +2,7 @@ package calendar
 
 import org.scalatest.PropSpec
 import net.liftweb.json.JsonParser
-import pickles._
+import jsonpicklers._
 
 class GoogleCalendar extends PropSpec {
   

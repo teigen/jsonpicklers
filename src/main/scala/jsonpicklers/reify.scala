@@ -1,4 +1,4 @@
-package pickles
+package jsonpicklers
 
 trait Reify[A]{ self =>
   def reify(any:Any):Option[A]

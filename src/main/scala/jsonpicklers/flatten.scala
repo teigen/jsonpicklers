@@ -1,4 +1,4 @@
-package pickles
+package jsonpicklers
 
 trait FlattenTilde {
   private class Tilde[A](a:A){

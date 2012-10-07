@@ -1,7 +1,7 @@
 package collectionjson
 
 import java.net.{URISyntaxException, URI}
-import pickles._
+import jsonpicklers._
 import Picklers._
 
 object CollectionJson {
