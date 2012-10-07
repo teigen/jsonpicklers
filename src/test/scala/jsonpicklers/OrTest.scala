@@ -55,4 +55,15 @@ class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
     assert(field.pickle(true) === JObject(List(JField("bool", JBool(true)))))
     assert(field.pickle(false) === JObject(List(JField("bool", JBool(false)))))
   }
+
+  property("field ?? <i>") {
+    forAll{ (a:Int, b:Int) =>
+      val field = ("num" :: int) ?? a
+      val pickled = field.pickle(b)
+      if (a == b)
+        assert(pickled === JObject(Nil))
+      else
+        assert(pickled === JObject(List(JField("num", JInt(b)))) )
+    }
+  }
 }

@@ -54,7 +54,10 @@ sealed trait Pickler[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]]{ self
   def ? = optional
   
   def ? (orElse: => A):Like[A] = 
-    self.?.getOrElse(orElse) 
+    self.?.getOrElse(orElse)
+
+  def ?? (orElse: A): Like[A] =
+    self.?.getOrElseIgnoreDefault(orElse)
 
   def <  (rhs:A)(implicit ordering:Ordering[A]) = filter(a => ordering.lt(a, rhs),   "expected value < "  + rhs)
   def <= (rhs:A)(implicit ordering:Ordering[A]) = filter(a => ordering.lteq(a, rhs), "expected value <= " + rhs)
@@ -62,6 +65,7 @@ sealed trait Pickler[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]]{ self
   def >= (rhs:A)(implicit ordering:Ordering[A]) = filter(a => ordering.gteq(a, rhs), "expected value >= " + rhs)
 
   def getOrElse[B](orElse: => B)(implicit ev1:A => Option[B], ev2:Option[B] => A) = wrap(_.getOrElse(orElse))(Some(_))
+  def getOrElseIgnoreDefault[B](orElse: B)(implicit ev1:A => Option[B], ev2:Option[B] => A) = wrap(_.getOrElse(orElse))(u => if(orElse == u) None else Some(u))
 }
 
 trait Or[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]] extends Pickler[A, Json, Like]{
