@@ -76,10 +76,10 @@ trait Or[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]] extends Pickler[A
 case class JsonValue[A](unpickle:Parser[A], tryPickle:A => Option[JValue]) extends Pickler[A, JValue, JsonValue] with Or[A, JValue, JsonValue] { self =>
 
   def wrap[B](w: (A) => B)(u: (B) => A) =
-    new JsonValue[B](unpickle map w, u andThen tryPickle)
+    JsonValue[B](unpickle map w, u andThen tryPickle)
 
   def filter(predicate: (A) => Boolean, msg: String) =
-    new JsonValue[A](unpickle.filter(predicate, msg), a => if(predicate(a)) Some(pickle(a)) else None)
+    JsonValue[A](unpickle.filter(predicate, msg), a => if(predicate(a)) Some(pickle(a)) else None)
 
   def optional: JsonValue[Option[A]] = {
     def tryPickle(a: Option[A]) = a.map(self.tryPickle).getOrElse(Some(JNull))
@@ -93,7 +93,7 @@ case class JsonValue[A](unpickle:Parser[A], tryPickle:A => Option[JValue]) exten
       val t:Parser[T] = self.unpickle
       t | other.unpickle
     }
-    new JsonValue[T](unpickle, tryPickle)
+    JsonValue[T](unpickle, tryPickle)
   }
 
   def unpickle(json:JValue):Result[A] = unpickle(Root(json)) match {
@@ -128,16 +128,16 @@ case class JsonValue[A](unpickle:Parser[A], tryPickle:A => Option[JValue]) exten
 
 object JsonProperty{
   implicit def asObject[A](field:JsonProperty[A]) =
-    new JsonObject[A](field.unpickle, field.tryPickle)
+    JsonObject[A](field.unpickle, field.tryPickle)
   
   implicit def asValue[A](field:JsonProperty[A]) =
-    new JsonValue[A](field.unpickle, field.tryPickle)  
+    JsonValue[A](field.unpickle, field.tryPickle)
 }
 
 case class JsonProperty[A](name:String, value:JsonValue[A]) extends Pickler[A, JObject, JsonProperty] { self =>
   
   def tryPickle = value.tryPickle(_).map{
-    case JNothing => JObject(Nil)
+    case JNothing  => JObject(Nil)
     case something => JObject(List(JField(name, something)))
   }
   
@@ -158,7 +158,7 @@ case class JsonProperty[A](name:String, value:JsonValue[A]) extends Pickler[A, J
 
 object JsonObject {
   implicit def asValue[A](obj:JsonObject[A]) =
-    new JsonValue[A](obj.unpickle, obj.tryPickle)  
+    JsonValue[A](obj.unpickle, obj.tryPickle)
 }
 
 case class JsonObject[A](unpickle:Parser[A], tryPickle:A => Option[JObject]) extends Pickler[A, JObject, JsonObject] with Or[A, JObject, JsonObject]{ self =>
