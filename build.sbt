@@ -2,8 +2,6 @@ name := "jsonpicklers"
 
 organization := "com.jteigen"
 
-version := "0.1-SNAPSHOT"
-
 scalaVersion := "2.9.1"
 
 description := "A pickler library for json"
@@ -15,6 +13,8 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "1.7.1" % "test"
 libraryDependencies += "org.scala-tools.testing" %% "scalacheck" % "1.9" % "test"
 
 scalacOptions += "-unchecked"
+
+releaseSettings
 
 publishMavenStyle := true
 
