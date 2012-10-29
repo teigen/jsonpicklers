@@ -45,7 +45,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
         ("sizes" :: ( * :: Size.json))
       }
     }
-    case class Sizes(shapes:Map[String,Size])
+    case class Sizes(sizes:Map[String,Size])
 
     val json = parse("""
                     {
