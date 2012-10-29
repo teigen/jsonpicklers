@@ -5,7 +5,7 @@ import org.scalatest.matchers._
 import jsonpicklers.Picklers._
 import net.liftweb.json._
 
-class ApiExamples2 extends FreeSpec with ShouldMatchers {
+class ApiExamples extends FreeSpec with ShouldMatchers {
 
   "Supports simple values (Hello(\"world\"))" - {
 
