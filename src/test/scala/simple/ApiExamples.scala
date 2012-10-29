@@ -31,7 +31,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     }
   }
 
-  "Supports optional fields (Optional(Option[\"world\"]))" - {
+  "Supports optional fields (Hello(Option[\"world\"]))" - {
 
     object Hello {
       val json = wrap(apply)(unapply(_).get){
