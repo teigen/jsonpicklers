@@ -2,13 +2,13 @@ package simple
 
 import org.scalatest._
 import org.scalatest.matchers._
-import jsonpicklers.Picklers._
 import net.liftweb.json._
+import jsonpicklers._
+import Picklers._
 
 class ApiExamples extends FreeSpec with ShouldMatchers {
 
   "Supports simple values" - {
-
     object Hello {
       val json = wrap(apply)(unapply(_).get){
         "message" :: string
@@ -30,8 +30,8 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
       }
     }
   }
-  "Supports lists of primitives" - {
 
+  "Supports lists of primitives" - {
     object ListOfPrimitives {
       val json = wrap(apply)(unapply(_).get){
         "values" :: int.*
@@ -48,6 +48,46 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
     "unpickles" in {
       ListOfPrimitives.json.unpickle(json) match {
+        case jsonpicklers.Success(value, _) => value should equal(scala)
+        case f => fail(f.toString)
+      }
+    }
+  }
+
+  "Supports custom types" - {
+    import java.net.URI
+    object MyTypes {
+      val uri = {
+        def tryPickle(a: URI) = string.tryPickle(a.toString)
+        def unpickle = Parser{ location =>
+          def un(s:String, location:Location):Result[URI] = try{
+            Success(new URI(s), location)
+          } catch {
+            case e => Failure(e.getMessage, location)
+          }
+          string.unpickle(location).flatMap{ s => un(s, location) }
+        }
+        JsonValue(unpickle, tryPickle)
+      }
+    }
+    import MyTypes._
+
+    object CustomTypes {
+      val json = wrap(apply)(unapply(_).get){
+        "some_uri" :: uri
+      }
+    }
+    case class CustomTypes(uri:URI)
+
+    val json = parse("""{ "some_uri": "http://example.com/foo?filter=2#bar" }""")
+    val scala = CustomTypes(new URI("http://example.com/foo?filter=2#bar"))
+
+    "pickles" in {
+      CustomTypes.json.pickle(scala) should equal(json)
+    }
+
+    "unpickles" in {
+      CustomTypes.json.unpickle(json) match {
         case jsonpicklers.Success(value, _) => value should equal(scala)
         case f => fail(f.toString)
       }
