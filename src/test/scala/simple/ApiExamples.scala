@@ -31,6 +31,37 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     }
   }
 
+  "Supports optional fields (Optional(Option[\"world\"]))" - {
+
+    object Hello {
+      val json = wrap(apply)(unapply(_).get){
+        ("message" :: string).?
+      }
+    }
+    case class Hello(message:Option[String])
+
+    val json = parse("""{ "message": "world" }""")
+    val json2 = parse("""{ }""")
+    val scala = Hello(Some("world"))
+    val scala2 = Hello(None)
+
+    "pickles" in {
+      Hello.json.pickle(scala) should equal(json)
+      Hello.json.pickle(scala2) should equal(json2)
+    }
+
+    "unpickles" in {
+      Hello.json.unpickle(json) match {
+        case jsonpicklers.Success(value, _) => value should equal(scala)
+        case f => fail(f.toString)
+      }
+      Hello.json.unpickle(json2) match {
+        case jsonpicklers.Success(value, _) => value should equal(scala2)
+        case f => fail(f.toString)
+      }
+    }
+  }
+
   "Supports maps of named values (Map[String,Obj])" - {
     object Size {
       val json = wrap(apply)(unapply(_).get){
