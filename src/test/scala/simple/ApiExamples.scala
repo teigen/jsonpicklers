@@ -7,7 +7,7 @@ import net.liftweb.json._
 
 class ApiExamples extends FreeSpec with ShouldMatchers {
 
-  "Supports simple values (Hello(\"world\"))" - {
+  "Supports simple values" - {
 
     object Hello {
       val json = wrap(apply)(unapply(_).get){
@@ -19,19 +19,42 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     val json = parse("""{ "message": "world" }""")
     val scala = Hello("world")
 
-    "pickles" in {
+    "pickles to json" in {
       Hello.json.pickle(scala) should equal(json)
     }
 
-    "unpickles" in {
+    "unpickles to scala" in {
       Hello.json.unpickle(json) match {
         case jsonpicklers.Success(value, _) => value should equal(scala)
         case f => fail(f.toString)
       }
     }
   }
+  "Supports lists of primitives" - {
 
-  "Supports optional fields (Hello(Option[\"world\"]))" - {
+    object ListOfPrimitives {
+      val json = wrap(apply)(unapply(_).get){
+        "values" :: int.*
+      }
+    }
+    case class ListOfPrimitives(values:List[Int])
+
+    val json = parse("""{ "values": [1,2,3,4] }""")
+    val scala = ListOfPrimitives(List(1,2,3,4))
+
+    "pickles" in {
+      ListOfPrimitives.json.pickle(scala) should equal(json)
+    }
+
+    "unpickles" in {
+      ListOfPrimitives.json.unpickle(json) match {
+        case jsonpicklers.Success(value, _) => value should equal(scala)
+        case f => fail(f.toString)
+      }
+    }
+  }
+
+  "Supports optionally missing fields" - {
 
     object Hello {
       val json = wrap(apply)(unapply(_).get){
