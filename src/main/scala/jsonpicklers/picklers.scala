@@ -31,6 +31,9 @@ object Picklers extends FlattenTilde {
 
   def unique[A](values:JsonValue[List[A]]) = 
     values.filter(v => v.distinct == v, "expected all elements to be unique")
+
+  implicit def propertyIsObject[A](prop:JsonProperty[A]) =
+    JsonProperty.asObject(prop)
 }
 
 sealed trait Pickler[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]]{ self =>
@@ -38,12 +41,19 @@ sealed trait Pickler[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]]{ self
   def pickle: A => Json = tryPickle.andThen(_.get)
   def unpickle:Parser[A]
 
-  def wrap[B](w:A => B)(u:B => A):Like[B]
+  def flatWrap[B](w:A => Location => Result[B])(u:B => Option[A]):Like[B]
+
+  def trying[B](w:A => Location => Result[B])(u:B => Option[A]):Like[B] =
+    flatWrap[B](a => l => try{ w(a)(l) } catch { case ex:Exception => Parsers.failure(ex.getMessage)(l) })(u)
+
+  def wrap[B](w:A => B)(u:B => A):Like[B] =
+    flatWrap[B](a => l => Success(w(a), l))(b => Some(u(b)))
   
   def ^^ [B](wrapper:Wrap[A, B]) = 
     wrap(wrapper.wrap)(wrapper.unwrap)
   
-  def filter(predicate:A => Boolean, msg:String):Like[A]
+  def filter(predicate:A => Boolean, msg:String):Like[A] =
+    flatWrap[A](a => l => if(predicate(a)) Success(a, l) else Failure(msg, l))(a => if (predicate(a)) Some(a) else None)
   
   // TODO const, ~>, <~
 
@@ -75,11 +85,8 @@ trait Or[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]] extends Pickler[A
 
 case class JsonValue[A](unpickle:Parser[A], tryPickle:A => Option[JValue]) extends Pickler[A, JValue, JsonValue] with Or[A, JValue, JsonValue] { self =>
 
-  def wrap[B](w: (A) => B)(u: (B) => A) =
-    JsonValue[B](unpickle map w, u andThen tryPickle)
-
-  def filter(predicate: (A) => Boolean, msg: String) =
-    JsonValue[A](unpickle.filter(predicate, msg), a => if(predicate(a)) Some(pickle(a)) else None)
+  def flatWrap[B](w: (A) => (Location) => Result[B])(u: (B) => Option[A]) =
+    JsonValue[B](Parser{ location => unpickle(location).flatMap(w(_)(location))}, u(_).flatMap(tryPickle))
 
   def optional: JsonValue[Option[A]] = {
     def tryPickle(a: Option[A]) = a.map(self.tryPickle).getOrElse(Some(JNull))
@@ -129,7 +136,7 @@ case class JsonValue[A](unpickle:Parser[A], tryPickle:A => Option[JValue]) exten
 object JsonProperty{
   implicit def asObject[A](field:JsonProperty[A]) =
     JsonObject[A](field.unpickle, field.tryPickle)
-  
+
   implicit def asValue[A](field:JsonProperty[A]) =
     JsonValue[A](field.unpickle, field.tryPickle)
 }
@@ -149,11 +156,8 @@ case class JsonProperty[A](name:String, value:JsonValue[A]) extends Pickler[A, J
     JsonProperty(name, JsonValue[Option[A]](unpickle, tryPickle))
   }
 
-  def wrap[B](w: (A) => B)(u: (B) => A) = 
-    JsonProperty(name, value.wrap(w)(u))
-
-  def filter(predicate: (A) => Boolean, msg: String) = 
-    JsonProperty(name, value.filter(predicate, msg))
+  def flatWrap[B](w: (A) => (Location) => Result[B])(u: (B) => Option[A]) =
+    JsonProperty(name, value.flatWrap(w)(u))
 }
 
 object JsonObject {
@@ -163,11 +167,8 @@ object JsonObject {
 
 case class JsonObject[A](unpickle:Parser[A], tryPickle:A => Option[JObject]) extends Pickler[A, JObject, JsonObject] with Or[A, JObject, JsonObject]{ self =>
 
-  def wrap[B](w: (A) => B)(u: (B) => A) =    
-    JsonObject[B](unpickle map w, u andThen tryPickle)  
-
-  def filter(predicate: (A) => Boolean, msg: String) = 
-    JsonObject[A](unpickle.filter(predicate, msg), a => if(predicate(a)) Some(pickle(a)) else None)  
+  def flatWrap[B](w: (A) => (Location) => Result[B])(u: (B) => Option[A]) =
+    JsonObject[B](Parser{ location => unpickle(location).flatMap(w(_)(location))}, u(_).flatMap(tryPickle))
 
   def or[T >: A, B <: T](other: Pickler[B, JObject, JsonObject])(implicit ra:Reify[A], rb:Reify[B]) = {
     def tryPickle(t: T) = ra.reify(t).flatMap(self.tryPickle) orElse rb.reify(t).flatMap(other.tryPickle)

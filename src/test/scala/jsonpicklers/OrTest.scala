@@ -6,23 +6,20 @@ import org.scalatest.PropSpec
 import net.liftweb.json.JsonParser
 import net.liftweb.json.JsonAST._
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
+import org.scalacheck.Gen.oneOf
+import org.scalacheck.Arbitrary.arbitrary
 
 class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
   
   property("or - multiple"){
-    forAll{ (i:Int, s:String, d:Double, r:Int) =>
+    forAll(oneOf(arbitrary[Int], arbitrary[String], arbitrary[Double])){ value:Any =>
       val element = int | string | double
-      val value = math.abs(r % 3) match {
-        case 0 => i
-        case 1 => s
-        case 2 => d 
-      }
       val pickled = element.pickle(value)
       assert(element.unpickle(pickled).get === value)
     }
   }
 
-  property("or") {
+  property("or - wrapped") {
     sealed trait Value
     case class StringValue(value: String) extends Value
     case class IntValue(value: Int) extends Value
@@ -56,7 +53,7 @@ class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
     assert(field.pickle(false) === JObject(List(JField("bool", JBool(false)))))
   }
 
-  property("field ?? <i>") {
+  property("ignored default values on pickle (field ?? <i>)") {
     forAll{ (a:Int, b:Int) =>
       val field = ("num" :: int) ?? a
       val pickled = field.pickle(b)

@@ -3,6 +3,8 @@ package jsonpicklers
 import net.liftweb.json.JsonAST._
 
 trait Result[+A]{
+  def location:Location
+
   def map[B](f:A => B) = this match {
     case Success(value, location) => Success(f(value), location)
     case f:Failure                => f
@@ -16,22 +18,22 @@ trait Result[+A]{
     case n         => n
   }
 
-  def isFailure = this match {
-    case _:Failure => true
-    case _         => false
+  def fold[X](f:(String, Location) => X, s:(A, Location) => X):X = this match {
+    case Success(value, l) => s(value, l)
+    case Failure(msg, l)   => f(msg, l)
   }
 
-  def isSuccess = !isFailure
-  
-  def get:A = this match {
-    case Success(value, _) => value
-    case failure => sys.error(failure.toString)              
-  }
+  def either:Either[(String, Location), (A, Location)] =
+    fold((msg, l) => Left((msg, l)), (a, l) => Right((a, l)))
+
+  def isSuccess = fold((_, _) => false, (_, _) => true)
+
+  def isFailure = !isSuccess
+
+  def get:A = fold((m, l) => throw new NoSuchElementException("Failure("+l+", " + m + ", " + l.json +")"), (v, _) => v)
 }
 case class Success[+A](value:A, location:Location) extends Result[A]
-case class Failure(msg:String, location:Location) extends Result[Nothing]{
-  override def toString = "Failure("+location+", "+msg + ", " + location.json+")"
-}
+case class Failure(msg:String, location:Location) extends Result[Nothing]
 
 object Parsers {
   

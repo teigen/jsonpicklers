@@ -56,21 +56,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
   "Supports custom types" - {
     import java.net.URI
-    object MyTypes {
-      val uri = {
-        def tryPickle(a: URI) = string.tryPickle(a.toString)
-        def unpickle = Parser{ location =>
-          def un(s:String, location:Location):Result[URI] = try{
-            Success(new URI(s), location)
-          } catch {
-            case e => Failure(e.getMessage, location)
-          }
-          string.unpickle(location).flatMap{ s => un(s, location) }
-        }
-        JsonValue(unpickle, tryPickle)
-      }
-    }
-    import MyTypes._
+    val uri = string.trying(a => Parsers.success(new URI(a)))(u => Some(u.toString))
 
     object CustomTypes {
       val json = wrap(apply)(unapply(_).get){
@@ -91,6 +77,13 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
         case jsonpicklers.Success(value, _) => value should equal(scala)
         case f => fail(f.toString)
       }
+    }
+
+    "pickle negative" in {
+      val unpickled = CustomTypes.json.unpickle(JObject(List(JField("some_uri", JString("\\")))))
+      unpickled.fold(
+        (msg, _) => assert(msg === """Illegal character in path at index 0: \"""),
+        (ok, _)  => fail("expected failure, got " + ok))
     }
   }
 
@@ -125,7 +118,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     }
   }
 
-  "Supports maps of named values (Map[String,Obj])" - {
+  "Supports maps of named values (Map[String,A])" - {
     object Size {
       val json = wrap(apply)(unapply(_).get){
         ("x" :: int) ~
@@ -164,5 +157,4 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
       }
     }
   }
-
 }

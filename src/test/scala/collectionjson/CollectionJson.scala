@@ -77,17 +77,5 @@ object CollectionJson {
   lazy val value   = "value"   :: string
   lazy val version = "version" :: string
 
-  val uri = {
-    def tryPickle(a: URI) = string.tryPickle(a.toString)
-    def unpickle = Parser{ location => 
-      string.unpickle(location).flatMap{ s =>
-        try{
-          Success(new URI(s), location)
-        } catch {
-          case ex:URISyntaxException => Failure(ex.getMessage, location)
-        }
-      }
-    }
-    JsonValue(unpickle, tryPickle)
-  }
+  lazy val uri = string.trying(a => Parsers.success(new URI(a)))(u => Some(u.toString))
 }

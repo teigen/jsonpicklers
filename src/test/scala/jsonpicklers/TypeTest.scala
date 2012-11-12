@@ -6,6 +6,7 @@ import org.scalatest.PropSpec
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import net.liftweb.json.JsonAST._
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 
 class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   
@@ -191,6 +192,18 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
         }
         
         assert(values.unpickle(JArray(list.map(JInt(_)))).isFailure === true)
+    }
+  }
+
+  property("trying"){
+    val trying = string.trying(s => Parsers.success(s.toInt))(num => Some(num.toString))
+
+    forAll{ i:Int =>
+      assert(trying.unpickle(JString(i.toString)).isSuccess === true)
+    }
+
+    forAll(Gen.alphaStr){ s =>
+      assert(trying.unpickle(JString(s)).isFailure === true)
     }
   }
 }

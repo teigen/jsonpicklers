@@ -7,19 +7,15 @@ import java.net.{MalformedURLException, URL}
 
 object Types {
   val url = {
-    def noProtocol(s:String) = "no protocol:.*".r.pattern.matcher(s).matches()
-    def tryPickle(a: URL) = string.tryPickle(a.toString)
-    def unpickle = Parser{ location =>
-      def un(s:String, location:Location):Result[URL] = try{
-        Success(new URL(s), location)
-      } catch {
-        case ex:MalformedURLException if noProtocol(ex.getMessage) => un("http://" + s, location)
-        case ex => Failure(ex.getMessage, location)
-      }      
-      string.unpickle(location).flatMap{ s => un(s, location) }
+    def parseUrl(s:String):Parser[URL] = try {
+      val u = new URL(s)
+      Parsers.success(u) // success is call-by-name
+    } catch {
+      case ex:MalformedURLException if ex.getMessage.startsWith("no protocol:") => parseUrl("http://"+s)
+      case ex:Exception => Parsers.failure(ex.getMessage)
     }
-    JsonValue(unpickle, tryPickle)
-  }  
+    string.flatWrap[URL](parseUrl)(u => Some(u.toString))
+  }
 }
 
 import Types._
