@@ -6,13 +6,17 @@ scalaVersion := "2.9.1"
 
 description := "A pickler library for json"
 
-libraryDependencies += "net.liftweb" %% "lift-json" % "2.4"
+libraryDependencies += "org.json4s" %% "json4s-ast" % "3.1.0-SNAPSHOT"
+
+libraryDependencies += "org.json4s" %% "json4s-native" % "3.1.0-SNAPSHOT" % "test"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.7.1" % "test"
 
 libraryDependencies += "org.scala-tools.testing" %% "scalacheck" % "1.9" % "test"
 
 scalacOptions += "-unchecked"
+
+resolvers += "sonatype snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 releaseSettings
 

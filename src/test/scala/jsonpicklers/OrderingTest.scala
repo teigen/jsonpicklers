@@ -2,7 +2,7 @@ package jsonpicklers
 
 import Picklers._
 
-import net.liftweb.json.JsonAST.{JField, JObject, JInt}
+import org.json4s.JsonAST.{JObject, JInt}
 import org.scalacheck._
 import org.scalacheck.Prop._
 
@@ -26,7 +26,7 @@ object OrderingTest extends Properties("ordering") {
   
   property("object >") = forAll{ (a:Int, b:Int) =>
     val obj = value > Value(b)
-    val json = JObject(List(JField("value", JInt(a)))) 
+    val json = JObject("value" -> JInt(a))
     
     (a > b) ==> (obj.pickle(Value(a)) == json) :| "pickle" &&
     (a > b) ==> obj.unpickle(json).isSuccess   :| "unpickle"
@@ -34,7 +34,7 @@ object OrderingTest extends Properties("ordering") {
   
   property("object > (failure)") = forAll{ (a:Int, b:Int) =>
     val obj = value > Value(b)
-    val json = JObject(List(JField("value", JInt(a))))
+    val json = JObject("value" -> JInt(a))
     
     !(a > b) ==> (obj.pickle(Value(a)) throws classOf[RuntimeException]) :| "pickle" &&
     !(a > b) ==> obj.unpickle(json).isFailure                            :| "unpickle"

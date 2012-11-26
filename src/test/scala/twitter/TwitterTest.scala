@@ -2,7 +2,7 @@ package twitter
 
 import org.scalatest.PropSpec
 import io.Source
-import net.liftweb.json.JsonParser
+import org.json4s.native.JsonParser
 
 class TwitterTest extends PropSpec {
   

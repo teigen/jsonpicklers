@@ -3,7 +3,7 @@ package jsonpicklers
 import Picklers._
 
 import org.scalatest.PropSpec
-import net.liftweb.json.JsonParser
+import org.json4s.native.JsonParser
 
 class PropertySelectorTest extends PropSpec {
 

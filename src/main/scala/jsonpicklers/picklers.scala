@@ -1,6 +1,6 @@
 package jsonpicklers
 
-import net.liftweb.json.JsonAST._
+import org.json4s.JsonAST._
 
 /*
  * TODO, error messages on failing tryPickle ?
@@ -127,9 +127,9 @@ case class JsonValue[A](unpickle:Parser[A], tryPickle:A => Option[JValue]) exten
         for{
           list <- acc
           pickled <- self.tryPickle(v)
-        } yield JField(name, pickled) :: list
+        } yield (name, pickled) :: list
     }
-    JsonValue(selector :: unpickle, tryPickle(_).map(JObject))
+    JsonValue(selector :: unpickle, tryPickle(_).map(fields => JObject(fields)))
   }
 }
 

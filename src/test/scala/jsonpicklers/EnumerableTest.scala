@@ -3,14 +3,14 @@ package jsonpicklers
 import Picklers._
 
 import org.scalatest.PropSpec
-import net.liftweb.json.JsonAST._
+import org.json4s.JsonAST._
 
 class EnumerableTest extends PropSpec {
   property("string literal / positive") {
 
     val field = "a" :: string("b")
 
-    val json = JObject(List(JField("a", JString("b"))))
+    val json = JObject("a" -> JString("b"))
 
     val unpickled = field.unpickle(json).get
 
@@ -22,7 +22,7 @@ class EnumerableTest extends PropSpec {
   property("string literal / negative") {
     val field = "a" :: string("b")
 
-    val json = JObject(List(JField("a", JString("a"))))
+    val json = JObject("a" -> JString("a"))
 
     val unpickled = field.unpickle(json)
 
@@ -35,7 +35,7 @@ class EnumerableTest extends PropSpec {
   property("string enumerable / positive") {
     val field = "a" :: string("a", "b")
 
-    val json = JObject(List(JField("a", JString("b"))))
+    val json = JObject("a" -> JString("b"))
 
     val unpickled = field.unpickle(json).get
 
@@ -46,7 +46,7 @@ class EnumerableTest extends PropSpec {
   property("string enumerable / negative") {
     val field = "a" :: string("a", "b")
 
-    val json = JObject(List(JField("a", JString("c"))))
+    val json = JObject("a" -> JString("c"))
 
     val unpickled = field.unpickle(json)
 

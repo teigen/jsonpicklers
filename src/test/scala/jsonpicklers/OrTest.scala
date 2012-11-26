@@ -3,8 +3,7 @@ package jsonpicklers
 import Picklers._
 
 import org.scalatest.PropSpec
-import net.liftweb.json.JsonParser
-import net.liftweb.json.JsonAST._
+import org.json4s.JsonAST._
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalacheck.Gen.oneOf
 import org.scalacheck.Arbitrary.arbitrary
@@ -37,7 +36,7 @@ class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
 
     val test = a ~ b ^^ wrapTwoValues
 
-    val input = JsonParser.parse("""{"a":1, "b":"Hello"}""")
+    val input = JObject("a" -> JInt(1), "b" -> JString("Hello"))
     val unpickled: Result[TwoValues] = test.unpickle(input)
     
     val expected = TwoValues(IntValue(1), StringValue("Hello"))
@@ -49,8 +48,8 @@ class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
   property("default values and or-else") {
     val field = ("bool" :: boolean).?(false)
     assert(field.unpickle(JObject(Nil)).get === false)
-    assert(field.pickle(true) === JObject(List(JField("bool", JBool(true)))))
-    assert(field.pickle(false) === JObject(List(JField("bool", JBool(false)))))
+    assert(field.pickle(true) === JObject("bool" -> JBool(true)))
+    assert(field.pickle(false) === JObject("bool" -> JBool(false)))
   }
 
   property("ignored default values on pickle (field ?? <i>)") {
@@ -58,9 +57,9 @@ class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
       val field = ("num" :: int) ?? a
       val pickled = field.pickle(b)
       if (a == b)
-        assert(pickled === JObject(Nil))
+        assert(pickled === JObject())
       else
-        assert(pickled === JObject(List(JField("num", JInt(b)))) )
+        assert(pickled === JObject("num" -> JInt(b)))
     }
   }
 }

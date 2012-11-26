@@ -1,6 +1,6 @@
 package examples
 
-import net.liftweb.json.parse
+import org.json4s.native.JsonParser.parse
 
 import jsonpicklers._
 import Picklers._

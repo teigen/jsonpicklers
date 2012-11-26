@@ -2,7 +2,7 @@ package simple
 
 import org.scalatest._
 import org.scalatest.matchers._
-import net.liftweb.json._
+import org.json4s.JsonAST._
 import jsonpicklers._
 import Picklers._
 
@@ -16,7 +16,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     }
     case class Hello(message:String)
 
-    val json = parse("""{ "message": "world" }""")
+    val json = JObject("message" -> JString("world"))
     val scala = Hello("world")
 
     "pickles to json" in {
@@ -39,7 +39,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     }
     case class ListOfPrimitives(values:List[Int])
 
-    val json = parse("""{ "values": [1,2,3,4] }""")
+    val json = JObject("values" -> JArray(List(JInt(1), JInt(2), JInt(3), JInt(4))))
     val scala = ListOfPrimitives(List(1,2,3,4))
 
     "pickles" in {
@@ -65,7 +65,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     }
     case class CustomTypes(uri:URI)
 
-    val json = parse("""{ "some_uri": "http://example.com/foo?filter=2#bar" }""")
+    val json = JObject("some_uri" -> JString("http://example.com/foo?filter=2#bar"))
     val scala = CustomTypes(new URI("http://example.com/foo?filter=2#bar"))
 
     "pickles" in {
@@ -80,7 +80,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     }
 
     "pickle negative" in {
-      val unpickled = CustomTypes.json.unpickle(JObject(List(JField("some_uri", JString("\\")))))
+      val unpickled = CustomTypes.json.unpickle(JObject("some_uri" -> JString("\\")))
       unpickled.fold(
         (msg, _) => assert(msg === """Illegal character in path at index 0: \"""),
         (ok, _)  => fail("expected failure, got " + ok))
@@ -96,8 +96,8 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     }
     case class Hello(message:Option[String])
 
-    val json = parse("""{ "message": "world" }""")
-    val json2 = parse("""{ }""")
+    val json = JObject("message" -> JString("world"))
+    val json2 = JObject()
     val scala = Hello(Some("world"))
     val scala2 = Hello(None)
 
@@ -122,7 +122,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     object Size {
       val json = wrap(apply)(unapply(_).get){
         ("x" :: int) ~
-          ("y" :: int)
+        ("y" :: int)
       }
     }
     case class Size(x:Int, y:Int)
@@ -134,15 +134,12 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     }
     case class Sizes(sizes:Map[String,Size])
 
-    val json = parse("""
-                    {
-                      "sizes" : {
-                        "small": { "x": 200, "y": 200 },
-                        "medium":{ "x": 400, "y": 400 },
-                        "large": { "x": 600, "y": 600 }
-                      }
-                    }
-                    """)
+    val json =
+      JObject("sizes" ->
+        JObject("small"  -> JObject("x" -> JInt(200), "y" -> JInt(200)),
+                "medium" -> JObject("x" -> JInt(400), "y" -> JInt(400)),
+                "large"  -> JObject("x" -> JInt(600), "y" -> JInt(600))))
+
 
     val scala = Sizes(Map("small" -> Size(200, 200), "medium" -> Size(400, 400), "large" -> Size(600, 600)))
 

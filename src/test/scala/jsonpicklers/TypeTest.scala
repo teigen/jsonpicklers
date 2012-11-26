@@ -4,7 +4,7 @@ import Picklers._
 
 import org.scalatest.PropSpec
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
-import net.liftweb.json.JsonAST._
+import org.json4s.JsonAST._
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
@@ -60,7 +60,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   property("property") {
     forAll(nonEmptyString, arbitrary[Int]) {
       (name, value) =>
-        val json = JObject(List(JField(name, JInt(value))))
+        val json = JObject(name -> JInt(value))
         val field = name :: int
         assert(field.unpickle(json).get === value)
         assert(field.pickle(value) === json)
@@ -78,7 +78,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
     forAll(names, arbitrary[Int], arbitrary[Int]) {
       (names, aVal, bVal) =>
         val (aName, bName) = names
-        val json = JObject(List(JField(aName, JInt(aVal)), JField(bName, JInt(bVal))))
+        val json = JObject(aName -> JInt(aVal), bName -> JInt(bVal))
         val seq = (aName :: int) ~ (bName :: int)
         val vals = new ~(aVal, bVal)
         assert(seq.unpickle(json).get === vals)
@@ -89,7 +89,7 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
   property("option (property)") {
     forAll(nonEmptyString, arbitrary[Option[Int]]) {
       (name, value) =>
-        val json = JObject(value.map(value => JField(name, JInt(value))).toList)
+        val json = JObject(value.map(value => name -> JInt(value)).toList)
         val field = option(name :: int)
         assert(field.unpickle(json).get === value)
         assert(field.pickle(value) === json)
@@ -150,12 +150,12 @@ class TypeTest extends PropSpec with GeneratorDrivenPropertyChecks {
     forAll{ (a:Int, b:String, d:Boolean, e:Double) =>
       val v = Value(a, b, Sub(d, e))      
       val pickled = value.pickle(v)
-      assert(pickled === JObject(List(
-        JField("a", JInt(a)),
-        JField("b", JString(b)),
-        JField("c", JObject(List(
-          JField("d", JBool(d)),
-          JField("e", JDouble(e))))))))
+      assert(pickled === JObject(
+        ("a", JInt(a)),
+        ("b", JString(b)),
+        ("c", JObject(
+          ("d", JBool(d)),
+          ("e", JDouble(e))))))
       
       assert(value.unpickle(pickled).get === v)
     }

@@ -1,7 +1,7 @@
 package calendar
 
 import org.scalatest.PropSpec
-import net.liftweb.json.JsonParser
+import org.json4s.native.JsonParser
 import jsonpicklers._
 
 class GoogleCalendar extends PropSpec {

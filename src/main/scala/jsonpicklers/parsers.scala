@@ -1,6 +1,6 @@
 package jsonpicklers
 
-import net.liftweb.json.JsonAST._
+import org.json4s.JsonAST._
 
 trait Result[+A]{
   def location:Location
@@ -139,11 +139,11 @@ case class Parser[+A](run:Location => Result[A]) extends (Location => Result[A])
   def :: (selector:Selector) = Parser{ location =>
     location.json match {
       case JObject(fields) =>
-        fields.filter(field => selector.filter(field.name)).foldLeft[Result[Map[String, A]]](Success(Map.empty, location)){
+        fields.filter(field => selector.filter(field._1)).foldLeft[Result[Map[String, A]]](Success(Map.empty, location)){
           (map, field) => for{
             m <- map
-            v <- apply(location(field.name))
-          } yield m + (field.name -> v)
+            v <- apply(location(field._1))
+          } yield m + (field._1 -> v)
         }
       case _ => Failure("expected object", location)
     }
