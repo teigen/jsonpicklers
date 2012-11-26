@@ -2,7 +2,9 @@ name := "jsonpicklers"
 
 organization := "com.jteigen"
 
-scalaVersion := "2.9.1"
+scalaVersion := "2.9.2"
+
+crossScalaVersions := Seq("2.9.0", "2.9.0-1", "2.9.1", "2.9.1-1", "2.9.2")
 
 description := "A pickler library for json"
 
@@ -10,9 +12,9 @@ libraryDependencies += "org.json4s" %% "json4s-ast" % "3.1.0-SNAPSHOT"
 
 libraryDependencies += "org.json4s" %% "json4s-native" % "3.1.0-SNAPSHOT" % "test"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "1.7.1" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % "1.8" % "test"
 
-libraryDependencies += "org.scala-tools.testing" %% "scalacheck" % "1.9" % "test"
+libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.10.0" % "test"
 
 scalacOptions += "-unchecked"
 
