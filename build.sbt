@@ -4,17 +4,17 @@ organization := "com.jteigen"
 
 scalaVersion := "2.9.2"
 
-crossScalaVersions := Seq("2.9.0", "2.9.0-1", "2.9.1", "2.9.1-1", "2.9.2")
+crossScalaVersions := Seq("2.9.0", "2.9.0-1", "2.9.1", "2.9.1-1", "2.9.2", "2.10.0-RC2", "2.10.0-RC3")
 
 description := "A pickler library for json"
 
-libraryDependencies += "org.json4s" %% "json4s-ast" % "3.1.0-SNAPSHOT"
+libraryDependencies += "org.json4s" %% "json4s-ast" % "3.1.0-SNAPSHOT" cross CrossVersion.full
 
-libraryDependencies += "org.json4s" %% "json4s-native" % "3.1.0-SNAPSHOT" % "test"
+libraryDependencies += "org.json4s" %% "json4s-native" % "3.1.0-SNAPSHOT" % "test" cross CrossVersion.full
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "1.8" % "test"
+libraryDependencies <+= (scalaVersion){ v => "org.scalatest" %% "scalatest" % (if("2.10.0-RC3" == v) "1.8-B1" else "1.8") % "test" cross CrossVersion.full }
 
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.10.0" % "test"
+libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.10.0" % "test" cross CrossVersion.full
 
 scalacOptions += "-unchecked"
 
