@@ -2,15 +2,15 @@ name := "jsonpicklers"
 
 organization := "com.jteigen"
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.0"
 
-crossScalaVersions := Seq("2.9.0", "2.9.0-1", "2.9.1", "2.9.1-1", "2.9.2", "2.10.0-RC2", "2.10.0-RC3")
+crossScalaVersions := Seq("2.9.0", "2.9.0-1", "2.9.1", "2.9.1-1", "2.9.2", "2.10.0-RC2", "2.10.0-RC3", "2.10.0")
 
 description := "A pickler library for json"
 
-libraryDependencies += "org.json4s" %% "json4s-ast" % "3.1.0-SNAPSHOT" cross CrossVersion.full
+libraryDependencies += "org.json4s" %% "json4s-ast" % "3.1.0" cross CrossVersion.binary
 
-libraryDependencies += "org.json4s" %% "json4s-native" % "3.1.0-SNAPSHOT" % "test" cross CrossVersion.full
+libraryDependencies += "org.json4s" %% "json4s-native" % "3.1.0" cross CrossVersion.binary
 
 libraryDependencies <+= (scalaVersion){ v => "org.scalatest" %% "scalatest" % (if("2.10.0-RC3" == v) "1.8-B1" else "1.8") % "test" cross CrossVersion.full }
 
