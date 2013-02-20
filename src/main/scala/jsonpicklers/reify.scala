@@ -47,7 +47,7 @@ trait ReifyAnyRef {
 
     def reify(any: Any) = any match {
       case ref:AnyRef =>
-        val result = man >:> ClassManifest.singleType(ref)
+        val result = man >:> Manifest.singleType(ref)
         if (result) Some(ref.asInstanceOf[A]) else None
       case _ => None
     }

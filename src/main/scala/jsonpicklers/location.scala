@@ -23,7 +23,7 @@ sealed trait Location {
     FieldLocation(child, name, this)
   }
 
-  def apply(index:Int)   = ArrayLocation(json(index), index, this)
+  def apply(index:Int) = ArrayLocation(json(index), index, this)
 }
 
 case class Root(json:JValue) extends Location

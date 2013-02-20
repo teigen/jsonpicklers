@@ -2,7 +2,7 @@ package jsonpicklers
 
 import org.json4s.JsonAST._
 
-trait Result[+A]{
+sealed trait Result[+A]{
   def location:Location
 
   def map[B](f:A => B) = this match {
