@@ -1,41 +1,13 @@
 package jsonpicklers
 
 import org.json4s.JsonAST._
+import java.text.{DateFormat, SimpleDateFormat}
 
-sealed trait Result[+A]{
-  def location:Location
+object Parsers extends Parsers with FlattenTilde
 
-  def map[B](f:A => B) = this match {
-    case Success(value, location) => Success(f(value), location)
-    case f:Failure                => f
-  }
-  def flatMap[B](f:A => Result[B]) = this match {
-    case Success(value, location) => f(value)
-    case f:Failure                => f
-  }
-  def orElse[B >: A](other: => Result[B]) = this match {
-    case f:Failure => other
-    case n         => n
-  }
+trait Parsers {
 
-  def fold[X](f:(String, Location) => X, s:(A, Location) => X):X = this match {
-    case Success(value, l) => s(value, l)
-    case Failure(msg, l)   => f(msg, l)
-  }
-
-  def either:Either[(String, Location), (A, Location)] =
-    fold((msg, l) => Left((msg, l)), (a, l) => Right((a, l)))
-
-  def isSuccess = fold((_, _) => false, (_, _) => true)
-
-  def isFailure = !isSuccess
-
-  def get:A = fold((m, l) => throw new NoSuchElementException("Failure("+l+", " + m + ", " + l.json +")"), (v, _) => v)
-}
-case class Success[+A](value:A, location:Location) extends Result[A]
-case class Failure(msg:String, location:Location) extends Result[Nothing]
-
-object Parsers {
+  val * = Selector.*
   
   def expect[A](name:String)(f:PartialFunction[JValue, A]) = Parser{ location =>
     f.lift(location.json).map(a => Success(a, location)).getOrElse(Failure("expected "+name, location))
@@ -47,33 +19,50 @@ object Parsers {
   def failure(msg: => String) =
     Parser{ location => Failure(msg, location) }
 
-  def NULL = expect("null"){
-    case JNull => null
+  def NULL = expect("null"){ case JNull => null }
+
+  def nothing = expect("Nothing"){ case JNothing => () }
+  
+  def int = expect("Int"){ case JInt(v) if(v.isValidInt) => v.intValue() }
+  
+  def string = expect("String"){ case JString(str) => str }
+  
+  def double = expect("Double"){ case JDouble(d) => d }
+  
+  def bigint = expect("Int"){ case JInt(v) => v }
+  
+  def boolean = expect("Boolean"){ case JBool(b) => b }
+
+  def date(format: => SimpleDateFormat) = string.flatMap{
+    s => Parser{ location => try{ Success(format.parse(s), location) } catch { case ex:Exception => Failure("expected date ("+ format.toPattern +")", location)} }
   }
 
-  def nothing = expect("Nothing"){
-    case JNothing => ()
+  def date(format:String):Parser[java.util.Date] = date(new SimpleDateFormat(format))
+
+  def trying[A](f: => A) = Parser{ location =>
+    try{ Success(f, location)} catch { case ex:Exception => Failure(ex.getMessage, location) }
   }
-  
-  def int = expect("Int"){
-    case JInt(v) if(v.isValidInt) => v.intValue()
+
+  def option[A](parser:Parser[A]):Parser[Option[A]] =
+    parser.?
+
+  def either[A, B](left:Parser[A], right:Parser[B]):Parser[Either[A, B]] =
+    left.map(Left(_)) | right.map(Right(_))
+
+  class StringParserOps(parser:Parser[String]){
+    class Prop[A](name:String, prop:String => A)(implicit ordering:Ordering[A]){
+      import ordering._
+
+      def >  (rhs:A) = parser.filter(prop(_) > rhs,  "expected "+name+" > "  + rhs)
+      def >= (rhs:A) = parser.filter(prop(_) >= rhs, "expected "+name+" >= " + rhs)
+      def <  (rhs:A) = parser.filter(prop(_) < rhs,  "expected "+name+" < "  + rhs)
+      def <= (rhs:A) = parser.filter(prop(_) <= rhs, "expected "+name+" <= " + rhs)
+    }
+
+    object length extends Prop("length", _.length)
   }
-  
-  def string = expect("String"){
-    case JString(str) => str
-  }
-  
-  def double = expect("Double"){
-    case JDouble(d) => d
-  }
-  
-  def bigint = expect("Int"){
-    case JInt(v) => v
-  }
-  
-  def boolean = expect("Boolean"){
-    case JBool(b) => b
-  }
+
+  implicit def stringParserOps(parser:Parser[String]) = new StringParserOps(parser)
 }
 
 case class Parser[+A](run:Location => Result[A]) extends (Location => Result[A]){
@@ -88,7 +77,7 @@ case class Parser[+A](run:Location => Result[A]) extends (Location => Result[A])
   
   def ^^ [B] (f:A => B):Parser[B] = 
     map(f)
-  
+
   def ^^^ [B] (b: => B):Parser[B] = 
     map(_ => b)
   
@@ -148,4 +137,9 @@ case class Parser[+A](run:Location => Result[A]) extends (Location => Result[A])
       case _ => Failure("expected object", location)
     }
   }
+
+  def >  [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.gt(a, rhs),   "expected value > "  + rhs)
+  def >= [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.gteq(a, rhs), "expected value >= " + rhs)
+  def <  [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.lt(a, rhs),   "expected value < "  + rhs)
+  def <= [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.lteq(a, rhs), "expected value <= " + rhs)
 }

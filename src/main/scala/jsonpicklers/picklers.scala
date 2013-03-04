@@ -6,7 +6,9 @@ import org.json4s.JsonAST._
  * TODO, error messages on failing tryPickle ?
  */
 
-object Picklers extends FlattenTilde {
+object Picklers extends Picklers with FlattenTilde
+
+trait Picklers {
   val  * = Selector.*
 
   val string  = JsonValue[String](Parsers.string, v => Some(JString(v)))
@@ -189,7 +191,7 @@ case class JsonObject[A](unpickle:Parser[A], tryPickle:A => Option[JObject]) ext
         pb <- other.tryPickle(b)
       } yield pa merge pb
 
-    JsonObject[A ~ B](unpickle ~ other.unpickle, { case a ~ b => tryPickle(a, b) })  
+    JsonObject[A ~ B](unpickle ~ other.unpickle, { case a ~ b => tryPickle(a, b) })
   }
 }
 
