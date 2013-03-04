@@ -191,12 +191,8 @@ case class JsonObject[A](unpickle:Parser[A], tryPickle:A => Option[JObject]) ext
         pb <- other.tryPickle(b)
       } yield pa merge pb
 
-    JsonObject[A ~ B](unpickle ~ other.unpickle, { case a ~ b => tryPickle(a, b) })
+    JsonObject[(A, B)](unpickle ~ other.unpickle, { case (a, b) => tryPickle(a, b) })
   }
-}
-
-case class ~[+A, +B](_1:A, _2:B){
-  def ~[C](c:C) = new ~(this, c)
 }
 
 case class Wrap[A, B](wrap:A => B, unwrap:B => A){

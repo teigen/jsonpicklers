@@ -1,14 +1,14 @@
 package jsonpicklers
 
 import org.json4s.JsonAST._
-import java.text.{DateFormat, SimpleDateFormat}
+import java.text.{SimpleDateFormat}
 
 object Parsers extends Parsers with FlattenTilde
 
 trait Parsers {
 
   val * = Selector.*
-  
+
   def expect[A](name:String)(f:PartialFunction[JValue, A]) = Parser{ location =>
     f.lift(location.json).map(a => Success(a, location)).getOrElse(Failure("expected "+name, location))
   }
@@ -84,12 +84,12 @@ case class Parser[+A](run:Location => Result[A]) extends (Location => Result[A])
   def >> [B] (f:A => Parser[B]):Parser[B] = 
     flatMap(f)
   
-  def ~ [B] (rhs: => Parser[B]): Parser[A ~ B] = {
+  def ~ [B] (rhs: => Parser[B]): Parser[(A, B)] = {
     lazy val r = rhs
     for{
       a <- this
       b <- r
-    } yield new ~(a, b)
+    } yield (a, b)
   }
   
   def ~> [B] (rhs: => Parser[B]): Parser[B] =

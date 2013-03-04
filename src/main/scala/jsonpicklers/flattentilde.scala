@@ -1,8 +1,11 @@
 package jsonpicklers
 
 trait FlattenTilde {
+  type ~[+A, +B] = (A, B)
+  val ~ = Tuple2
+
   private class Tilde[A](a:A){
-    def ~[B](b:B) = new ~(a, b)
+    def ~[B](b:B) = (a, b)
   }
   private implicit def tilde[A](a:A) = new Tilde[A](a)
 
