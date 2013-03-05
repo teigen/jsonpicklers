@@ -4,7 +4,8 @@ import org.scalatest._
 import org.scalatest.matchers._
 import org.json4s.JsonAST._
 import jsonpicklers._
-import Picklers._
+
+import Picklers._, Result._
 
 class ApiExamples extends FreeSpec with ShouldMatchers {
 
@@ -25,7 +26,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
     "unpickles to scala" in {
       Hello.json.unpickle(json) match {
-        case jsonpicklers.Success(value, _) => value should equal(scala)
+        case Success(value, _) => value should equal(scala)
         case f => fail(f.toString)
       }
     }
@@ -48,7 +49,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
     "unpickles" in {
       ListOfPrimitives.json.unpickle(json) match {
-        case jsonpicklers.Success(value, _) => value should equal(scala)
+        case Success(value, _) => value should equal(scala)
         case f => fail(f.toString)
       }
     }
@@ -74,7 +75,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
     "unpickles" in {
       CustomTypes.json.unpickle(json) match {
-        case jsonpicklers.Success(value, _) => value should equal(scala)
+        case Success(value, _) => value should equal(scala)
         case f => fail(f.toString)
       }
     }
@@ -108,11 +109,11 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
     "unpickles" in {
       Hello.json.unpickle(json) match {
-        case jsonpicklers.Success(value, _) => value should equal(scala)
+        case Success(value, _) => value should equal(scala)
         case f => fail(f.toString)
       }
       Hello.json.unpickle(json2) match {
-        case jsonpicklers.Success(value, _) => value should equal(scala2)
+        case Success(value, _) => value should equal(scala2)
         case f => fail(f.toString)
       }
     }
@@ -149,7 +150,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
     "unpickles" in {
       Sizes.json.unpickle(json) match {
-        case jsonpicklers.Success(value, _) => value should equal(scala)
+        case Success(value, _) => value should equal(scala)
         case f => fail(f.toString)
       }
     }

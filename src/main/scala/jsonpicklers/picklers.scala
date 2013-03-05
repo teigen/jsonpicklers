@@ -1,6 +1,9 @@
 package jsonpicklers
 
 import org.json4s.JsonAST._
+import Result.{Success, Failure}
+import java.text.SimpleDateFormat
+import java.util.Date
 
 /*
  * TODO, error messages on failing tryPickle ?
@@ -19,6 +22,11 @@ trait Picklers {
   val NULL    = new JsonValue[Null](Parsers.NULL, _ => Some(JNull)){
     def apply[B](value:B):JsonValue[B] = wrap(_ => value)(_ => null)
   }
+  def date(format: => SimpleDateFormat) = {
+    lazy val f = format
+    JsonValue[Date](Parsers.date(f), v => Some(JString(f.format(v))))
+  }
+  def date(format:String):JsonValue[Date] = date(new SimpleDateFormat(format))
 
   def array[A](value:JsonValue[A]) = value.*
   def wrap[A, B](w:A => B)(u:B => A) = Wrap(w, u)

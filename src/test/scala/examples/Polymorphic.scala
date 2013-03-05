@@ -2,6 +2,7 @@ package examples
 
 import jsonpicklers._
 import Picklers._
+import Result._
 import org.scalatest.FunSuite
 
 class Polymorphic extends FunSuite {

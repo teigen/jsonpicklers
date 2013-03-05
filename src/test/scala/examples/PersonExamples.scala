@@ -4,6 +4,7 @@ import org.json4s.native.JsonParser.parse
 
 import jsonpicklers._
 import Picklers._
+import Result._
 import org.scalatest.FunSuite
 
 class PersonExamples extends FunSuite {

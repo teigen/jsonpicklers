@@ -1,6 +1,6 @@
 package jsonpicklers
 
-import Picklers._
+import Picklers._, Result._
 
 import org.scalatest.PropSpec
 import org.json4s.JsonAST._

@@ -1,12 +1,12 @@
 package jsonpicklers
 
 import org.json4s.JsonAST._
-import java.text.{SimpleDateFormat}
+import java.text.SimpleDateFormat
+import Result.{Success, Failure}
 
 object Parsers extends Parsers with FlattenTilde
 
 trait Parsers {
-
   val * = Selector.*
 
   def expect[A](name:String)(f:PartialFunction[JValue, A]) = Parser{ location =>
@@ -33,8 +33,9 @@ trait Parsers {
   
   def boolean = expect("Boolean"){ case JBool(b) => b }
 
-  def date(format: => SimpleDateFormat) = string.flatMap{
-    s => Parser{ location => try{ Success(format.parse(s), location) } catch { case ex:Exception => Failure("expected date ("+ format.toPattern +")", location)} }
+  def date(format: => SimpleDateFormat) = {
+    lazy val f = format
+    string.flatMap{ s => trying(f.parse(s)).fail.msg("expected date(" + f.toPattern + ")") }
   }
 
   def date(format:String):Parser[java.util.Date] = date(new SimpleDateFormat(format))
@@ -65,9 +66,19 @@ trait Parsers {
   implicit def stringParserOps(parser:Parser[String]) = new StringParserOps(parser)
 }
 
+object Parser {
+  trait FailProjection[+A]{
+    def msg(what:String):Parser[A]
+  }
+}
+
 case class Parser[+A](run:Location => Result[A]) extends (Location => Result[A]){
   
   def apply(location:Location) = run(location)
+
+  def fail[B >: A]:Parser.FailProjection[B] = new Parser.FailProjection[B]{
+    def msg(what: String): Parser[B] = Parser{ run(_).fail.msg(what) }
+  }
   
   def map[B](f:A => B):Parser[B] = 
     Parser{ apply(_).map(f) }

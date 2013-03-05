@@ -1,6 +1,20 @@
 package jsonpicklers
 
-sealed trait Result[+A]{
+object Result {
+  case class Success[+A](value:A, location:Location) extends Result[A]{
+    def isSuccess = true
+  }
+  case class Failure(msg:String, location:Location) extends Result[Nothing]{
+    def isSuccess = false
+  }
+  trait FailProjection[+A]{
+    def msg(what:String):Result[A]
+  }
+}
+
+sealed trait Result[+A]{ result =>
+  import Result._
+
   def location:Location
 
   def map[B](f:A => B) = this match {
@@ -30,11 +44,12 @@ sealed trait Result[+A]{
 
   def isFailure = !isSuccess
 
+  def fail:FailProjection[A] = new FailProjection[A]{
+    def msg(what: String): Result[A] = result match {
+      case Failure(_, location) => Failure(what, location)
+      case n => n
+    }
+  }
+
   def get:A = fold((m, l) => throw new NoSuchElementException("Failure("+l+", " + m + ", " + l.json +")"), (v, _) => v)
-}
-case class Success[+A](value:A, location:Location) extends Result[A]{
-  def isSuccess = true
-}
-case class Failure(msg:String, location:Location) extends Result[Nothing]{
-  def isSuccess = false
 }

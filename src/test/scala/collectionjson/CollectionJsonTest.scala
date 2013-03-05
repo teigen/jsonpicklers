@@ -11,10 +11,10 @@ class CollectionJsonTest extends PropSpec {
 
   def json(name: String) = {
     collectionjson.CollectionJson.collection.unpickle(source(name)) match {
-      case Success(_, _) =>
+      case Result.Success(_, _) =>
       //      println(s)
 
-      case f: Failure => fail(f.toString)
+      case f: Result.Failure => fail(f.toString)
     }
   }
 
