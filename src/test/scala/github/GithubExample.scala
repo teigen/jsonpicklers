@@ -15,19 +15,18 @@ import org.scalatest.FunSuite
 class GithubExample extends FunSuite with Resources {
 
   def date = string.flatMap{ s =>
-    getOrElse(
+    getOrFail(
       allCatch.opt((new SimpleDateFormat("yyyy-MM-dd'T'hh:MM:ss'Z'")).parse(s)),
       "expected ISO-8601 date")
   }
 
   def uri = string.flatMap{ s =>
-    getOrElse(
+    getOrFail(
       allCatch.opt(new URI(s)),
       "expected URL")
   }
 
   case class Event( id:String,
-                    `type`:String,
                     `public`:Boolean,
                     payload:JValue,
                     createdAt:Date,
@@ -62,46 +61,47 @@ class GithubExample extends FunSuite with Resources {
                   history:List[History])
 
   val file =
-    ("size" :: int) ~
+    ("size"     :: int) ~
     ("filename" :: string) ~
-    ("raw_url" :: uri) ^^ File
+    ("raw_url"  :: uri) ^^ File
 
   val changeStatus =
     ("deletions" :: int) ~
     ("additions" :: int) ~
-    ("total" :: int) ^^ ChangeStatus
+    ("total"     :: int) ^^ ChangeStatus
 
   val user =
-    ("id" :: int) ~
-      ("login" :: string) ~
-      ("url" :: string) ~
-      ("avatar_url" :: string) ~
-      ("gravatar_id" :: string) ^^ User
+    ("id"          :: int) ~
+    ("login"       :: string) ~
+    ("url"         :: string) ~
+    ("avatar_url"  :: string) ~
+    ("gravatar_id" :: string) ^^ User
 
   val history =
-    ("url" :: uri) ~
-    ("version" :: string) ~
-    ("user" :: user) ~
+    ("url"           :: uri) ~
+    ("version"       :: string) ~
+    ("user"          :: user) ~
     ("change_status" :: changeStatus) ~
-    ("committed_at" :: date) ^^ History
+    ("committed_at"  :: date) ^^ History
 
   val fork =
-    ("user" :: user) ~
-      ("url" :: uri) ~
-      ("created_at" :: date) ^^ Fork
+    ("user"       :: user) ~
+    ("url"        :: uri) ~
+    ("created_at" :: date) ^^ Fork
 
   val event = array(
+    ("type" :: "Event") ~> // discard 'type : "Event"'
     ("id" :: string) ~
-      ("type" :: string) ~
-      ("public" :: boolean) ~
-      ("payload" :: jvalue) ~
-      ("created_at" :: date) ~
-      ("repo" ::
-        ("id" :: int) ~
-          ("name" :: string) ~
-          ("url" :: string) ^^ Repo) ~
-      ("actor" :: user) ~
-      ("org" :: user) ^^ Event)
+    ("public" :: boolean) ~
+    ("payload" :: jvalue) ~
+    ("created_at" :: date) ~
+    ("repo" :: // repo is only used once so it can be defined inline
+      ("id" :: int) ~
+      ("name" :: string) ~
+      ("url" :: string) ^^ Repo) ~
+    ("actor" :: user) ~
+    ("org" :: user) ^^ Event)
+
 
   val gist =
     ("url" :: uri) ~
@@ -125,7 +125,7 @@ class GithubExample extends FunSuite with Resources {
     val repo = Repo(3, "octocat/Hello-World", "https://api.github.com/repos/octocat/Hello-World")
 
     assert(event(source("github/events.json")).get ===
-      List(Event("12345", "Event", true, JObject(Nil), new Date(1360166427000L),
+      List(Event("12345", true, JObject(Nil), new Date(1360166427000L),
         repo,
         octocat,
         octocat)))
