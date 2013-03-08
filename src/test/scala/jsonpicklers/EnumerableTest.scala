@@ -16,7 +16,7 @@ class EnumerableTest extends PropSpec {
 
     assert(unpickled === "b")
 
-    assert(field.pickle("b") == json)
+    assert(field.pickle("b") === json)
   }
 
   property("string literal / negative") {

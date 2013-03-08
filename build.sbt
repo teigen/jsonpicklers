@@ -6,15 +6,14 @@ scalaVersion := "2.10.0"
 
 crossScalaVersions := Seq("2.9.0", "2.9.0-1", "2.9.1", "2.9.1-1", "2.9.2", "2.10.0")
 
-description := "A pickler library for json"
+description := "A pickler/parser library for json4s"
 
 libraryDependencies += "org.json4s" %% "json4s-ast" % "3.1.0" cross CrossVersion.binary
 
-libraryDependencies += "org.json4s" %% "json4s-native" % "3.1.0" % "test" cross CrossVersion.binary
-
-libraryDependencies += "org.scalatest" %% "scalatest" % "1.8" % "test" cross CrossVersion.full
-
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.10.0" % "test" cross CrossVersion.full
+libraryDependencies ++= Seq(
+    "org.json4s" %% "json4s-native" % "3.1.0" % "test" cross CrossVersion.binary,
+    "org.scalatest" %% "scalatest" % "1.8" % "test" cross CrossVersion.full,
+    "org.scalacheck" %% "scalacheck" % "1.10.0" % "test" cross CrossVersion.full)
 
 scalacOptions ++= Seq("-unchecked", "-deprecation")
 

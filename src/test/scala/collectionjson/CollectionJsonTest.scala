@@ -1,13 +1,9 @@
 package collectionjson
 
 import org.scalatest.PropSpec
-import io.Source
-import org.json4s.native._
 import jsonpicklers._
 
-class CollectionJsonTest extends PropSpec {
-
-  def source(name: String) = JsonParser.parse(Source.fromFile("src/test/resources/" + name).bufferedReader())
+class CollectionJsonTest extends PropSpec with Resources {
 
   def json(name: String) = {
     collectionjson.CollectionJson.collection.unpickle(source(name)) match {
