@@ -70,6 +70,8 @@ trait Parsers { parsers =>
 
   def field[A](name:String, parser:Parser[A]) = Parser{ location => parser(location(name)) }
 
+  def field[A](approximate:Approximate.Field, parser:Parser[A]) = Parser{ location => parser(approximate(location)) }
+
   def fields[A](selector:Selector, parser:Parser[A]) = Parser{ location =>
     location.json match {
       case JObject(fields) =>
@@ -126,20 +128,23 @@ trait Parsers { parsers =>
                      | parsers.boolean.map(_.toString) )
 
     def array[A](parser:Parser[A]) = parser.* | parser.map(List(_))
-
-    def field[A](name:String, parser:Parser[A])(implicit approx:Approximate) = Parser{ location =>
-      parser(Approximate.field(name, location))
-    }
   }
 }
 
 object Approximate {
-  def field(name:String, location:Location)(implicit approx:Approximate) = {
-    location.json match {
+
+  case class Field(name:String, approximate:Approximate){
+    def apply(location:Location) = location.json match {
       case JObject(fields) =>
-        val sorted = fields.sortBy(field => approx.distance(name, field._1))
-        sorted.lastOption.map{ field => location(field._1) }.getOrElse(FieldLocation(JNothing, name, location))
-      case other => FieldLocation(JNothing, name, location)
+        val distances = fields.flatMap{ case JField(fname, _) =>
+          approximate.distance(fname, name).map( _ -> fname)
+        }
+        distances.sortWith(_._1 < _._1) match {
+          case (distance, field) :: tail if tail.forall(_._1 > distance) =>
+            location(field)
+          case _ => FieldLocation(JNothing, name, location)
+        }
+      case _ => FieldLocation(JNothing, name, location)
     }
   }
 
@@ -153,7 +158,7 @@ object Approximate {
       if(goal.equalsIgnoreCase(input)) Some(score) else None
   }
 
-  object Levenshtein extends Approximate {
+  case class Levenshtein(limit:Int) extends Approximate {
     def distance(s1: String, s2: String): Option[Int] = {
       val l1 = s1.length
       val l2 = s2.length
@@ -173,18 +178,17 @@ object Approximate {
           d(i-1)(j-1) + cost
         )
       }
-      Some(d(l1)(l2))
-    }
-
-    def < (i:Int):Approximate = new Approximate {
-      def distance(goal: String, input: String): Option[Int] =
-        Levenshtein.distance(goal, input).filter(_ < i)
+      val result = d(l1)(l2)
+      if(result <= limit)
+        Some(result)
+      else None
     }
   }
 }
 
 trait Approximate {
   def distance(goal:String, input:String):Option[Int]
+  def apply(name:String) = Approximate.Field(name, this)
 }
 
 object Parser {
@@ -266,7 +270,9 @@ case class Parser[+A](run:Location => Result[A]) extends (Location => Result[A])
 
   def :: (selector:Selector) = Parsers.fields(selector, this)
 
-  def ~:: (name:String)(implicit approximate:Approximate) = Parsers.lenient.field(name, this)
+  def :: (approximate:Approximate.Field) = Parsers.field(approximate, this)
+
+  def ~:: (name:String)(implicit approximate:Approximate) = approximate(name) :: this
 
   def >  [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.gt(a, rhs),   "expected value > "  + rhs)
   def >= [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.gteq(a, rhs), "expected value >= " + rhs)
