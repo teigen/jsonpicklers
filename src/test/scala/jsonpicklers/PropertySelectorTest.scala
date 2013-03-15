@@ -27,7 +27,7 @@ class PropertySelectorTest extends PropSpec {
     val expected = Map("a" -> "Hello", "b" -> "World")
 
     assert(unpickled === expected)
-    assert(fields.pickle(expected) === json)
+    assert(fields.pickle(expected).get === json)
   }
 
   property("* :: (string | integer)") {
@@ -49,7 +49,7 @@ class PropertySelectorTest extends PropSpec {
     val expected = Map("a" -> "Hello", "b" -> 5)
 
     assert(unpickled === expected)
-    assert(fields.pickle(expected) === json)
+    assert(fields.pickle(expected).get === json)
   }
 
   property("regex") {

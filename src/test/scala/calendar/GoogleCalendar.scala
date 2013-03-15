@@ -37,6 +37,6 @@ class GoogleCalendar extends PropSpec {
     
     assert(unpickled === expected)
     
-    assert(calendarList.pickle(expected) === source)
+    assert(calendarList.pickle(expected) === Some(source))
   }
 }

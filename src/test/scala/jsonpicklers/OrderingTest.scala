@@ -10,34 +10,34 @@ object OrderingTest extends Properties("ordering") {
   
   property("value >") = forAll{ (a:Int, b:Int) =>
     val field = int > b
-    (a > b) ==> (field.pickle(a) == JInt(a))      :| "pickle" &&
-    (a > b) ==> field.unpickle(JInt(a)).isSuccess :| "unpickle"
+    (a > b) ==> (field.pickle(a) == Some(JInt(a))) :| "pickle" &&
+    (a > b) ==> field.unpickle(JInt(a)).isSuccess  :| "unpickle"
   }
        
   property("value > (failure)") = forAll{ (a:Int, b:Int) =>
     val field = int > b
-    !(a > b) ==> (field.pickle(a) throws classOf[RuntimeException]) :| "pickle" &&
-    !(a > b) ==> field.unpickle(JInt(a)).isFailure                  :| "unpickle"
+    !(a > b) ==> field.pickle(a).isEmpty           :| "pickle" &&
+    !(a > b) ==> field.unpickle(JInt(a)).isFailure :| "unpickle"
   }
 
   case class Value(value:Int)
   implicit val ordering = Ordering.by[Value, Int](_.value)
-  val value = ("value" :: int).wrap(Value)(Value.unapply(_).get)  
+  val value = ("value" :: int).xmap(Value)(Value.unapply(_).get)
   
   property("object >") = forAll{ (a:Int, b:Int) =>
     val obj = value > Value(b)
     val json = JObject("value" -> JInt(a))
     
-    (a > b) ==> (obj.pickle(Value(a)) == json) :| "pickle" &&
-    (a > b) ==> obj.unpickle(json).isSuccess   :| "unpickle"
+    (a > b) ==> (obj.pickle(Value(a)) == Some(json)) :| "pickle" &&
+    (a > b) ==> obj.unpickle(json).isSuccess         :| "unpickle"
   }
   
   property("object > (failure)") = forAll{ (a:Int, b:Int) =>
     val obj = value > Value(b)
     val json = JObject("value" -> JInt(a))
     
-    !(a > b) ==> (obj.pickle(Value(a)) throws classOf[RuntimeException]) :| "pickle" &&
-    !(a > b) ==> obj.unpickle(json).isFailure                            :| "unpickle"
+    !(a > b) ==> obj.pickle(Value(a)).isEmpty  :| "pickle" &&
+    !(a > b) ==> obj.unpickle(json).isFailure  :| "unpickle"
   }
 
 

@@ -1,199 +1,178 @@
 package jsonpicklers
 
 import org.json4s.JsonAST._
-import Result.{Success, Failure}
 
-object Picklers extends Picklers with FlattenTilde
+object Picklers extends Picklers with FlattenTilde with Selectors {
+  lazy val parsers = Parsers
+}
 
 trait Picklers {
-  val * = Selector.*
 
-  val string  = JsonValue[String](Parsers.string, v => Some(JString(v)))
-  val int     = JsonValue[Int](Parsers.int, v => Some(JInt(v)))
-  val double  = JsonValue[Double](Parsers.double, v => Some(JDouble(v)))
-  val bigint  = JsonValue[BigInt](Parsers.bigint, v => Some(JInt(v)))
-  val boolean = JsonValue[Boolean](Parsers.boolean, v => Some(JBool(v)))
-  val NULL    = new JsonValue[Null](Parsers.NULL, _ => Some(JNull)){
-    def apply[B](value:B):JsonValue[B] = wrap(_ => value)(_ => null)
+  def parsers:Parsers
+
+  private def simple[A](parser:Parser[A], pickle:A => JValue) =
+    Pickler[A](parser, value => Some(pickle(value)), JNothing)
+
+  private def json4s[A <: JValue](parser:Parser[A]) = simple[A](parser, identity)
+
+  //json4s types
+  implicit val jvalue   = json4s(parsers.jvalue)
+  implicit val jarray   = json4s(parsers.jarray)
+  implicit val jobject  = json4s(parsers.jobject)
+  implicit val jnothing = json4s(parsers.jnothing)
+  implicit val jnull    = json4s(parsers.jnull)
+  implicit val jstring  = json4s(parsers.jstring)
+  implicit val jnumber  = json4s(parsers.jnumber)
+  implicit val jdouble  = json4s(parsers.jdouble)
+  implicit val jdecimal = json4s(parsers.jdecimal)
+  implicit val jint     = json4s(parsers.jint)
+  implicit val jbool    = json4s(parsers.jbool)
+
+  val NULL       = simple[Null](parsers.NULL, _ => JNull)
+  val nothing    = simple[Unit](parsers.nothing, _ => JNothing)
+
+  val int        = simple[Int](parsers.int, JInt(_))
+  val string     = simple[String](parsers.string, JString)
+  val double     = simple[Double](parsers.double, JDouble)
+  val bigint     = simple[BigInt](parsers.bigint, JInt)
+  val bigdecimal = simple[BigDecimal](parsers.bigdecimal, JDecimal)
+  val boolean    = simple[Boolean](parsers.boolean, JBool)
+  val long       = simple[Long](parsers.long, JInt(_))
+  val byte       = simple[Byte](parsers.byte, JInt(_))
+  val short      = simple[Short](parsers.short, JInt(_))
+  val char       = simple[Char](parsers.char, value => JInt(value))
+
+
+  def array[A](pickler:Pickler[A]) = pickler.*
+
+  def option[A](pickler:Pickler[A]) = pickler.?
+
+  def nullable[A](pickler:Pickler[A]) = Pickler[Option[A]](
+    parsers.nullable(pickler.unpickle),
+    _.map(pickler.pickle).getOrElse(Some(JNull)), pickler.empty)
+
+  def either[A : Reify, B : Reify](left:Pickler[A], right:Pickler[B]):Pickler[Either[A, B]] =
+    left.xmap(Left(_))(_.a) | right.xmap(Right(_))(_.b)
+
+  object xmap {
+    def apply[A, B](map:A => B)(contramap:B => A) = new XMap[A, B](map, contramap)
   }
 
-  def array[A](value:JsonValue[A]) = value.*
-  def wrap[A, B](w:A => B)(u:B => A) = Wrap(w, u)
-  def option[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]](pickler:Pickler[A, Json, Like]):Like[Option[A]] = pickler.optional
-  def select[A](filter:String => Boolean, value:JsonValue[A]) = Selector.filter(filter) :: value
-
-  def either[A : Reify, B : Reify, Json <: JValue, Like[X] <: Or[X, Json, Like]](a:Pickler[A, Json, Like], b:Pickler[B, Json, Like]):Like[Either[A, B]] = {
-    val left  = a.wrap(Left(_))(_.a)
-    val right = b.wrap(Right(_))(_.b)
-    left | right
+  object xflatMap {
+    def apply[A, B](flatMap:A => Parser[B])(contraflatMap:B => Option[A]) = new XFlatMap[A, B](flatMap, contraflatMap)
   }
-
-  def unique[A](values:JsonValue[List[A]]) = 
-    values.filter(v => v.distinct == v, "expected all elements to be unique")
-
-  implicit def propertyIsObject[A](prop:JsonProperty[A]) =
-    JsonProperty.asObject(prop)
 }
 
-sealed trait Pickler[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]]{ self =>
-  def tryPickle:A => Option[Json]
-  def pickle: A => Json = tryPickle.andThen(_.get)
+object Pickler {
+  def apply[A](unpickle:Parser[A], pickle:A => Option[JValue], empty:JValue):Pickler[A] =
+    new Value[A](unpickle, pickle, empty)
+
+  class Value[A](val unpickle:Parser[A], val pickle:A => Option[JValue], val empty:JValue) extends Pickler[A]
+
+  class Const[A](val const:A, pickler:Pickler[A]) extends Pickler[A]{
+    def unpickle: Parser[A] = pickler.unpickle
+    def pickle: (A) => Option[JValue] = pickler.pickle
+    def empty: JValue = pickler.empty
+
+    def ~> [B](next:Pickler[B]) = (pickler ~ next).xmap(_._2)(b => (const, b))
+  }
+}
+
+trait Pickler[A] {
   def unpickle:Parser[A]
+  def pickle:A => Option[JValue]
+  def empty:JValue
 
-  def flatWrap[B](w:A => Location => Result[B])(u:B => Option[A]):Like[B]
+  private def pickler[B](u:Parser[B], p:B => Option[JValue]) =
+    Pickler(u, p, empty)
 
-  def trying[B](w:A => Location => Result[B])(u:B => Option[A]):Like[B] =
-    flatWrap[B](a => l => try{ w(a)(l) } catch { case ex:Exception => Parsers.failure(ex.getMessage)(l) })(u)
+  def :: (name:String) = Pickler[A](
+    name :: unpickle,
+    pickle(_).map{
+      case JNothing => JObject(Nil)
+      case value    => JObject(name -> value)
+    },
+    JObject(Nil))
 
-  def wrap[B](w:A => B)(u:B => A):Like[B] =
-    flatWrap[B](a => l => Success(w(a), l))(b => Some(u(b)))
-  
-  def ^^ [B](wrapper:Wrap[A, B]) = 
-    wrap(wrapper.wrap)(wrapper.unwrap)
-  
-  def filter(predicate:A => Boolean, msg:String):Like[A] =
-    flatWrap[A](a => l => if(predicate(a)) Success(a, l) else Failure(msg, l))(a => if (predicate(a)) Some(a) else None)
+  def :: (selector:Selector) = Pickler[Map[String, A]](
+    selector :: unpickle,
+    _.foldRight[Option[List[JField]]](Some(Nil)){
+      case ((name, a), acc) => for {
+        fields <- acc
+        pa <- pickle(a)
+      } yield (name, pa) :: fields
+    }.map(JObject(_)),
+    JObject(Nil))
+
+  def ~ [B](next:Pickler[B]) = pickler[(A, B)](
+    unpickle ~ next.unpickle,
+    { case (a, b) =>
+      for {
+        pa <- pickle(a)
+        pb <- next.pickle(b)
+      } yield pa merge pb
+    })
+
+  def filter(predicate:A => Boolean, msg:String) = pickler[A](
+    unpickle.filter(predicate, msg),
+    a => if(predicate(a)) pickle(a) else None)
+
+  def ? = pickler[Option[A]](
+    Parsers.option(unpickle),
+    _.map(pickle).getOrElse(Some(empty)))
+
+  def ? (orElse:A):Pickler[A] = ?.getOrElse(orElse)
+
+  def ?? (orElse:A):Pickler[A] = ?.getOrElseIgnoreDefault(orElse)
+
+  def * = Pickler[List[A]](
+    Parsers.array(unpickle),
+    _.foldRight[Option[List[JValue]]](Some(Nil)){ (a, acc) =>
+      for {
+        list <- acc
+        pa <- pickle(a)
+      } yield pa :: list
+    }.map(JArray),
+    JNothing)
+
+  def + = *.filter(!_.isEmpty, "expected non-empty array")
+
+  def >  [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.gt(a, rhs),   "expected value > "  + rhs)
+  def >= [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.gteq(a, rhs), "expected value >= " + rhs)
+  def <  [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.lt(a, rhs),   "expected value < "  + rhs)
+  def <= [B >: A](rhs:B)(implicit ordering:Ordering[B]) = filter(a => ordering.lteq(a, rhs), "expected value <= " + rhs)
+
+  def xmap[B](map:A => B)(comap:B => A) = pickler[B](
+    unpickle.map(map),
+    comap andThen pickle)
+
+  def ^^ [B](x:XMap[A, B]) = xmap(x.map)(x.contramap)
+
+  def xflatMap[B](flatMap:A => Parser[B])(contraflatMap:B => Option[A]) = pickler[B](
+    unpickle.flatMap(flatMap),
+    contraflatMap(_).flatMap(pickle))
+
+  def >> [B](x:XFlatMap[A, B]) = xflatMap(x.flatMap)(x.contraflatMap)
+
+  def getOrElse[B](orElse:B)(implicit ev1:A =:= Option[B], ev2:Option[B] =:= A) = xmap(_.getOrElse(orElse))(Some(_))
+
+  def getOrElseIgnoreDefault[B](orElse:B)(implicit ev1:A =:= Option[B], ev2:Option[B] =:= A) = xmap(_.getOrElse(orElse))(value => if(value == orElse) None else Some(value))
+
+  def apply(const:A) = new Pickler.Const(const, this.filter(_ == const, "expected value == " + const))
 
   def apply(values:A*) = filter(values.contains, "expected one of " + values.mkString("(", ",", ")"))
-  
-  def optional :Like[Option[A]]
 
-  def ? = optional
-  
-  def ? (orElse: => A):Like[A] = 
-    self.?.getOrElse(orElse)
+  def <~ [B](next:Pickler.Const[B]) = (this ~ next).xmap(_._1)(a => (a, next.const))
 
-  def ?? (orElse: A): Like[A] =
-    self.?.getOrElseIgnoreDefault(orElse)
-
-  def <  (rhs:A)(implicit ordering:Ordering[A]) = filter(a => ordering.lt(a, rhs),   "expected value < "  + rhs)
-  def <= (rhs:A)(implicit ordering:Ordering[A]) = filter(a => ordering.lteq(a, rhs), "expected value <= " + rhs)
-  def >  (rhs:A)(implicit ordering:Ordering[A]) = filter(a => ordering.gt(a, rhs),   "expected value > "  + rhs)
-  def >= (rhs:A)(implicit ordering:Ordering[A]) = filter(a => ordering.gteq(a, rhs), "expected value >= " + rhs)
-
-  def getOrElse[B](orElse: => B)(implicit ev1:A => Option[B], ev2:Option[B] => A) = wrap(_.getOrElse(orElse))(Some(_))
-  def getOrElseIgnoreDefault[B](orElse: B)(implicit ev1:A => Option[B], ev2:Option[B] => A) = wrap(_.getOrElse(orElse))(u => if(orElse == u) None else Some(u))
+  def | [T >: A,  B <: T](next:Pickler[B])(implicit ra:Reify[A], rb:Reify[B]) = pickler[T](
+    (unpickle:Parser[T]) | next.unpickle,
+    t => ra.reify(t).flatMap(pickle) orElse rb.reify(t).flatMap(next.pickle))
 }
 
-trait Or[A, Json <: JValue, Like[X] <: Pickler[X, Json, Like]] extends Pickler[A, Json, Like]{
-  def or[T >: A, B <: T](other:Pickler[B, Json, Like])(implicit ra:Reify[A], rb:Reify[B]):Like[T]
-  def | [T >: A, B <: T](other:Pickler[B, Json, Like])(implicit ra:Reify[A], rb:Reify[B]):Like[T] = or[T, B](other)
+class XMap[A, B](val map:A => B, val contramap:B => A){
+  def apply(pickler:Pickler[A]) = pickler ^^ this
 }
 
-case class JsonValue[A](unpickle:Parser[A], tryPickle:A => Option[JValue]) extends Pickler[A, JValue, JsonValue] with Or[A, JValue, JsonValue] { self =>
-
-  def flatWrap[B](w: (A) => (Location) => Result[B])(u: (B) => Option[A]) =
-    JsonValue[B](Parser{ location => unpickle(location).flatMap(w(_)(location))}, u(_).flatMap(tryPickle))
-
-  def optional: JsonValue[Option[A]] = {
-    def tryPickle(a: Option[A]) = a.map(self.tryPickle).getOrElse(Some(JNull))
-    def unpickle = Parsers.NULL ^^^ None | self.unpickle.map(Some(_)) 
-    JsonValue(unpickle, tryPickle)
-  }
-
-  def or[T >: A, B <: T](other: Pickler[B, JValue, JsonValue])(implicit ra:Reify[A], rb:Reify[B]) = {
-    def tryPickle(t: T) = ra.reify(t).flatMap(self.tryPickle) orElse rb.reify(t).flatMap(other.tryPickle)
-    def unpickle:Parser[T] = {
-      val t:Parser[T] = self.unpickle
-      t | other.unpickle
-    }
-    JsonValue[T](unpickle, tryPickle)
-  }
-
-  def unpickle(json:JValue):Result[A] = unpickle(Root(json)) match {
-    case Success(value, _) => Success(value, Root(json))
-    case n => n
-  }
-
-  def * :JsonValue[List[A]] = {
-    def tryPickle(list:List[A]) = list.foldRight[Option[List[JValue]]](Some(Nil)){
-      (a, acc) => 
-        for{
-          lst <- acc
-          elem <- self.tryPickle(a)
-        } yield elem :: lst
-    }
-    JsonValue(unpickle.*, tryPickle(_).map(JArray))
-  }
-
-  def :: (name:String) = JsonProperty(name, this)
-  
-  def :: (selector:Selector): JsonValue[Map[String, A]] = {
-    def tryPickle(a: Map[String, A]) = a.toList.foldRight[Option[List[JField]]](Some(Nil)){
-      case ((name, v), acc) => 
-        for{
-          list <- acc
-          pickled <- self.tryPickle(v)
-        } yield (name, pickled) :: list
-    }
-    JsonValue(selector :: unpickle, tryPickle(_).map(fields => JObject(fields)))
-  }
-}
-
-object JsonProperty{
-  implicit def asObject[A](field:JsonProperty[A]) =
-    JsonObject[A](field.unpickle, field.tryPickle)
-
-  implicit def asValue[A](field:JsonProperty[A]) =
-    JsonValue[A](field.unpickle, field.tryPickle)
-}
-
-case class JsonProperty[A](name:String, value:JsonValue[A]) extends Pickler[A, JObject, JsonProperty] { self =>
-  
-  def tryPickle = value.tryPickle(_).map{
-    case JNothing  => JObject(Nil)
-    case something => JObject(List(JField(name, something)))
-  }
-  
-  def unpickle = name :: value.unpickle
-
-  def optional = {
-    def tryPickle(a: Option[A]) = a.map(value.tryPickle).getOrElse(Some(JNothing))
-    def unpickle = Parsers.nothing ^^^ None | value.unpickle.map(Some(_))
-    JsonProperty(name, JsonValue[Option[A]](unpickle, tryPickle))
-  }
-
-  def flatWrap[B](w: (A) => (Location) => Result[B])(u: (B) => Option[A]) =
-    JsonProperty(name, value.flatWrap(w)(u))
-}
-
-object JsonObject {
-  implicit def asValue[A](obj:JsonObject[A]) =
-    JsonValue[A](obj.unpickle, obj.tryPickle)
-}
-
-case class JsonObject[A](unpickle:Parser[A], tryPickle:A => Option[JObject]) extends Pickler[A, JObject, JsonObject] with Or[A, JObject, JsonObject]{ self =>
-
-  def flatWrap[B](w: (A) => (Location) => Result[B])(u: (B) => Option[A]) =
-    JsonObject[B](Parser{ location => unpickle(location).flatMap(w(_)(location))}, u(_).flatMap(tryPickle))
-
-  def or[T >: A, B <: T](other: Pickler[B, JObject, JsonObject])(implicit ra:Reify[A], rb:Reify[B]) = {
-    def tryPickle(t: T) = ra.reify(t).flatMap(self.tryPickle) orElse rb.reify(t).flatMap(other.tryPickle)
-    def unpickle:Parser[T] = {
-      val t:Parser[T] = self.unpickle
-      t | other.unpickle
-    }
-    JsonObject[T](unpickle, tryPickle)
-  }
-
-  def optional = 
-    JsonObject[Option[A]](unpickle.?, _.map(tryPickle).getOrElse(Some(JObject(Nil))))
-
-  def ~[B] (other:JsonObject[B]) = {
-    def tryPickle(a:A, b:B) = 
-      for{
-        pa <- self.tryPickle(a)
-        pb <- other.tryPickle(b)
-      } yield pa merge pb
-
-    JsonObject[(A, B)](unpickle ~ other.unpickle, { case (a, b) => tryPickle(a, b) })
-  }
-}
-
-case class Wrap[A, B](wrap:A => B, unwrap:B => A){
-  def ^^[C](wrapper:Wrap[B, C]) = 
-    Wrap[A, C](wrap andThen wrapper.wrap, wrapper.unwrap andThen unwrap)
-  
-  def apply[Json <: JValue, Like[X] <: Pickler[X, Json, Like]](pickler:Pickler[A, Json, Like]) =
-    pickler ^^ this
+class XFlatMap[A, B](val flatMap:A => Parser[B], val contraflatMap:B => Option[A]){
+  def apply(pickler:Pickler[A]) = pickler >> this
 }

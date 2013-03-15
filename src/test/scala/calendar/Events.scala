@@ -40,11 +40,11 @@ object Events {
                       comment:Option[String], 
                       additionalGuests:Int)
 
-  val extendedProperties = wrap(ExtendedProperties)(ExtendedProperties.unapply(_).get)
-  val gadget             = wrap(Gadget)(Gadget.unapply(_).get)
-  val person             = wrap(Person)(Person.unapply(_).get)
-  val time               = wrap(Time)(Time.unapply(_).get)
-  val attendee           = wrap(Attendee)(Attendee.unapply(_).get)
+  val extendedProperties = xmap(ExtendedProperties)(ExtendedProperties.unapply(_).get)
+  val gadget             = xmap(Gadget)(Gadget.unapply(_).get)
+  val person             = xmap(Person)(Person.unapply(_).get)
+  val time               = xmap(Time)(Time.unapply(_).get)
+  val attendee           = xmap(Attendee)(Attendee.unapply(_).get)
   
   
   ("kind"                   :: string("calendar#event")) ~

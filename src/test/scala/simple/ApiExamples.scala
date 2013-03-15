@@ -11,7 +11,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
   "Supports simple values" - {
     object Hello {
-      val json = wrap(apply)(unapply(_).get){
+      val json = xmap(apply)(unapply(_).get){
         "message" :: string
       }
     }
@@ -21,7 +21,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     val scala = Hello("world")
 
     "pickles to json" in {
-      Hello.json.pickle(scala) should equal(json)
+      Hello.json.pickle(scala) should equal(Some(json))
     }
 
     "unpickles to scala" in {
@@ -34,7 +34,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
   "Supports lists of primitives" - {
     object ListOfPrimitives {
-      val json = wrap(apply)(unapply(_).get){
+      val json = xmap(apply)(unapply(_).get){
         "values" :: int.*
       }
     }
@@ -44,7 +44,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     val scala = ListOfPrimitives(List(1,2,3,4))
 
     "pickles" in {
-      ListOfPrimitives.json.pickle(scala) should equal(json)
+      ListOfPrimitives.json.pickle(scala) should equal(Some(json))
     }
 
     "unpickles" in {
@@ -57,10 +57,10 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
   "Supports custom types" - {
     import java.net.URI
-    val uri = string.trying(a => Parsers.success(new URI(a)))(u => Some(u.toString))
+    val uri = string.xflatMap(a => Parsers.trying(new URI(a)))(u => Some(u.toString))
 
     object CustomTypes {
-      val json = wrap(apply)(unapply(_).get){
+      val json = xmap(apply)(unapply(_).get){
         "some_uri" :: uri
       }
     }
@@ -70,7 +70,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     val scala = CustomTypes(new URI("http://example.com/foo?filter=2#bar"))
 
     "pickles" in {
-      CustomTypes.json.pickle(scala) should equal(json)
+      CustomTypes.json.pickle(scala) should equal(Some(json))
     }
 
     "unpickles" in {
@@ -91,7 +91,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
   "Supports optionally missing fields" - {
 
     object Hello {
-      val json = wrap(apply)(unapply(_).get){
+      val json = xmap(apply)(unapply(_).get){
         ("message" :: string).?
       }
     }
@@ -103,8 +103,8 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     val scala2 = Hello(None)
 
     "pickles" in {
-      Hello.json.pickle(scala) should equal(json)
-      Hello.json.pickle(scala2) should equal(json2)
+      Hello.json.pickle(scala) should equal(Some(json))
+      Hello.json.pickle(scala2) should equal(Some(json2))
     }
 
     "unpickles" in {
@@ -121,7 +121,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
 
   "Supports maps of named values (Map[String,A])" - {
     object Size {
-      val json = wrap(apply)(unapply(_).get){
+      val json = xmap(apply)(unapply(_).get){
         ("x" :: int) ~
         ("y" :: int)
       }
@@ -129,7 +129,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     case class Size(x:Int, y:Int)
 
     object Sizes {
-      val json = wrap(apply)(unapply(_).get){
+      val json = xmap(apply)(unapply(_).get){
         ("sizes" :: ( * :: Size.json))
       }
     }
@@ -145,7 +145,7 @@ class ApiExamples extends FreeSpec with ShouldMatchers {
     val scala = Sizes(Map("small" -> Size(200, 200), "medium" -> Size(400, 400), "large" -> Size(600, 600)))
 
     "pickles" in {
-      Sizes.json.pickle(scala) should equal(json)
+      Sizes.json.pickle(scala) should equal(Some(json))
     }
 
     "unpickles" in {

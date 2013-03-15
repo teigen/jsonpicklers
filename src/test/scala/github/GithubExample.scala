@@ -90,7 +90,7 @@ class GithubExample extends FunSuite with Resources {
     ("created_at" :: date) ^^ Fork
 
   val event = array(
-    ("type" :: "Event") ~> // discard 'type : "Event"'
+    ("type" :: string.is("Event")) ~> // discard 'type : "Event"'
     ("id" :: string) ~
     ("public" :: boolean) ~
     ("payload" :: jvalue) ~

@@ -14,14 +14,14 @@ object Types {
       case ex:MalformedURLException if ex.getMessage.startsWith("no protocol:") => parseUrl("http://"+s)
       case ex:Exception => Parsers.failure(ex.getMessage)
     }
-    string.flatWrap[URL](parseUrl)(u => Some(u.toString))
+    string.xflatMap[URL](parseUrl)(u => Some(u.toString))
   }
 }
 
 import Types._
 
 object Entities {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     ("urls"          :: TweetURL.json.*) ~
     ("user_mentions" :: array(UserMention.json)) ~
     ("hashtags"      :: array(HashTag.json)) ~
@@ -35,7 +35,7 @@ case class Entities(urls:List[TweetURL],
                     media:List[Media])
 
 object Media {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     ("id"              :: int) ~
     ("id_str"          :: string) ~
     ("media_url"       :: url) ~
@@ -60,7 +60,7 @@ case class Media(id:Int, idStr:String,
                  indices:List[Int])
 
 object Size {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     ("w"      :: int) ~
     ("h"      :: int) ~
     ("resize" :: string("crop", "fit"))
@@ -72,7 +72,7 @@ case class Size(w:Int,
                 resize:String)
 
 object TweetURL {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     ("url"          :: url) ~
     ("display_url"  :: url) ~
     ("expanded_url" :: url) ~
@@ -86,7 +86,7 @@ case class TweetURL(url:URL,
                     indices:List[Int])
 
 object UserMention {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     ("id"          :: int) ~
     ("id_str"      :: string) ~
     ("screen_name" :: string) ~
@@ -103,7 +103,7 @@ case class UserMention(id:Int,
 
 
 object HashTag {
-  val json = wrap(apply)(unapply(_).get){  
+  val json = xmap(apply)(unapply(_).get){
     ("text"    :: string) ~
     ("indices" :: array(int))
   }  
@@ -114,14 +114,14 @@ case class HashTag(text:String,
 
 /* timeline */
 object TimeLine {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     array(Tweet.json)
   }
 }
 case class TimeLine(tweets:List[Tweet])
 
 object Tweet {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     ("id"                        :: bigint) ~
     ("id_str"                    :: string) ~
     ("created_at"                :: string) ~
@@ -162,7 +162,7 @@ case class Tweet(id: BigInt,
                  user: User)
 
 object User {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     // Need to chop chop! (22)
     UserData.json ~ UserCount.json ~ UserProfile.json ~ UserFlags.json
   } 
@@ -173,7 +173,7 @@ case class User(data:UserData, count:UserCount, profile:UserProfile, flags:UserF
 
 
 object UserData {
-    val json = wrap(apply)(unapply(_).get){
+    val json = xmap(apply)(unapply(_).get){
       ("id"          :: bigint ) ~
       ("id_str"      :: string ) ~
       ("url"         :: (url | NULL)) ~
@@ -202,7 +202,7 @@ case class UserData(id:BigInt,
                     description:Option[String])
       
 object UserCount {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     ("listed_count"     :: int) ~
     ("friends_count"    :: int) ~
     ("statuses_count"   :: int) ~
@@ -214,7 +214,7 @@ object UserCount {
 case class UserCount(listed:Int, friends:Int, statuses:Int, followers:Int, favourites:Int)
 
 object UserProfile {
-  val json = wrap(apply)(unapply(_).get){
+  val json = xmap(apply)(unapply(_).get){
     ("profile_use_background_image"       :: boolean) ~
     ("profile_background_image_url_https" :: url    ) ~
     ("profile_text_color"                 :: string ) ~
@@ -246,7 +246,7 @@ case class UserProfile(useBackgroundImage: Boolean,
                        linkColor: String)
 
 object UserFlags {
-  val json = wrap(apply)(unapply(_).get)(
+  val json = xmap(apply)(unapply(_).get)(
     ("protected"             :: boolean) ~
     ("geo_enabled"           :: boolean) ~
     ("contributors_enabled"  :: boolean) ~

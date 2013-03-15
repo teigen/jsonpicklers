@@ -31,10 +31,10 @@ class PersonExamples extends FunSuite {
 
   private def format = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
 
-  val date = string.trying(a => Parsers.success(format.parse(a)))(d => Some(format.format(d)))
+  val date = string.xflatMap(a => Parsers.trying(format.parse(a)))(d => Some(format.format(d)))
 
   object Child {
-    val json = wrap(apply)(unapply(_).get){
+    val json = xmap(apply)(unapply(_).get){
       ("name"      :: string) ~
       ("age"       :: int) ~
       ("birthdate" :: date).?
@@ -43,7 +43,7 @@ class PersonExamples extends FunSuite {
   case class Child(name: String, age: Int, birthdate: Option[java.util.Date])
 
   object Address {
-    val json = wrap(apply)(unapply(_).get){
+    val json = xmap(apply)(unapply(_).get){
       ("street" :: string) ~
       ("city"   :: string)
     }
@@ -51,7 +51,7 @@ class PersonExamples extends FunSuite {
   case class Address(street: String, city: String)
 
   object Person {
-    val json = wrap(apply)(unapply(_).get){
+    val json = xmap(apply)(unapply(_).get){
       ("name"     :: string) ~
       ("address"  :: Address.json) ~
       ("children" :: Child.json.*)
@@ -62,7 +62,7 @@ class PersonExamples extends FunSuite {
   test("pickle/unpickle"){
     val parsed        = parse(json)
     val Success(p, _) = Person.json.unpickle(parsed)
-    val pickled       = Person.json.pickle(p)
+    val Some(pickled) = Person.json.pickle(p)
     assert(parsed === pickled)
   }
 }

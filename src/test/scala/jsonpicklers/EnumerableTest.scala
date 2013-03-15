@@ -16,7 +16,7 @@ class EnumerableTest extends PropSpec {
 
     assert(unpickled === "b")
 
-    assert(field.pickle("b") === json)
+    assert(field.pickle("b") === Some(json))
   }
 
   property("string literal / negative") {
@@ -40,7 +40,7 @@ class EnumerableTest extends PropSpec {
     val unpickled = field.unpickle(json).get
 
     assert(unpickled === "b")
-    assert(field.pickle("b") === json)
+    assert(field.pickle("b") === Some(json))
   }
 
   property("string enumerable / negative") {

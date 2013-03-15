@@ -28,27 +28,27 @@ object CollectionJson {
     queries.?(Nil) ~ 
     template.?     ~ 
     error.?
-  }.wrap(CollectionJson)(CollectionJson.unapply(_).get)
+  }.xmap(CollectionJson)(CollectionJson.unapply(_).get)
 
   lazy val error = "error" :: {
     title.? ~ 
     code.?  ~ 
     message.?
-  }.wrap(Error)(Error.unapply(_).get)
+  }.xmap(Error)(Error.unapply(_).get)
 
-  lazy val template = "template" :: data.wrap(Template)(Template.unapply(_).get)
+  lazy val template = "template" :: data.xmap(Template)(Template.unapply(_).get)
 
   lazy val items = "items" :: array({
     href        ~ 
     data.?(Nil) ~ 
     links.?(Nil)
-  }.wrap(Item)(Item.unapply(_).get))
+  }.xmap(Item)(Item.unapply(_).get))
 
   lazy val data = "data" :: array({
     name.?  ~ 
     value.? ~ 
     prompt.?
-  }.wrap(Data)(Data.unapply(_).get))
+  }.xmap(Data)(Data.unapply(_).get))
 
   lazy val queries = "queries" :: array({
     href     ~ 
@@ -56,7 +56,7 @@ object CollectionJson {
     name.?   ~ 
     prompt.? ~ 
     data.?(Nil)
-  }.wrap(Query)(Query.unapply(_).get))
+  }.xmap(Query)(Query.unapply(_).get))
 
   lazy val links = "links" :: array({
     href     ~ 
@@ -64,7 +64,7 @@ object CollectionJson {
     name.?   ~ 
     render.? ~ 
     prompt.?
-  }.wrap(Link)(Link.unapply(_).get))
+  }.xmap(Link)(Link.unapply(_).get))
 
   lazy val code    = "code"    :: string
   lazy val href    = "href"    :: uri
@@ -77,5 +77,5 @@ object CollectionJson {
   lazy val value   = "value"   :: string
   lazy val version = "version" :: string
 
-  lazy val uri = string.trying(a => Parsers.success(new URI(a)))(u => Some(u.toString))
+  lazy val uri = string.xflatMap(a => Parsers.trying(new URI(a)))(u => Some(u.toString))
 }

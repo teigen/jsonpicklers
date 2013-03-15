@@ -4,7 +4,7 @@ import util.matching.Regex
 
 case class Selector(filter:String => Boolean)
 
-object Selector {
+trait Selectors {
 
   val * = Selector(_ => true)
 

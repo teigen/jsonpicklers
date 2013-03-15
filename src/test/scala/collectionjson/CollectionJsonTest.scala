@@ -6,12 +6,7 @@ import jsonpicklers._
 class CollectionJsonTest extends PropSpec with Resources {
 
   def json(name: String) = {
-    collectionjson.CollectionJson.collection.unpickle(source(name)) match {
-      case Result.Success(_, _) =>
-      //      println(s)
-
-      case f: Result.Failure => fail(f.toString)
-    }
+    collectionjson.CollectionJson.collection.unpickle(source(name)).get
   }
 
   property("minimal") {

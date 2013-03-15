@@ -13,7 +13,7 @@ class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
   property("or - multiple"){
     forAll(oneOf(arbitrary[Int], arbitrary[String], arbitrary[Double])){ value:Any =>
       val element = int | string | double
-      val pickled = element.pickle(value)
+      val Some(pickled) = element.pickle(value)
       assert(element.unpickle(pickled).get === value)
     }
   }
@@ -24,13 +24,13 @@ class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
     case class IntValue(value: Int) extends Value
     case class TwoValues(a: Value, b: Value)
 
-    val wrapStringValue = wrap(StringValue)(StringValue.unapply(_).get)
-    val wrapIntValue    = wrap(IntValue)(IntValue.unapply(_).get)
-    val wrapTwoValues   = wrap(TwoValues)(TwoValues.unapply(_).get)
+    val wrapStringValue = xmap(StringValue)(StringValue.unapply(_).get)
+    val wrapIntValue    = xmap(IntValue)(IntValue.unapply(_).get)
+    val wrapTwoValues   = xmap(TwoValues)(TwoValues.unapply(_).get)
 
     val stringValue = string ^^ wrapStringValue
     val intValue    = int    ^^ wrapIntValue
-    val value: JsonValue[Value] = stringValue | intValue
+    val value:Pickler[Value] = stringValue | intValue
     val a = "a" :: value
     val b = "b" :: value
 
@@ -42,20 +42,20 @@ class OrTest extends PropSpec with GeneratorDrivenPropertyChecks {
     val expected = TwoValues(IntValue(1), StringValue("Hello"))
 
     assert(unpickled.get === expected)
-    assert(test.pickle(expected) === input)
+    assert(test.pickle(expected).get === input)
   }
 
   property("default values and or-else") {
     val field = ("bool" :: boolean).?(false)
     assert(field.unpickle(JObject(Nil)).get === false)
-    assert(field.pickle(true) === JObject("bool" -> JBool(true)))
-    assert(field.pickle(false) === JObject("bool" -> JBool(false)))
+    assert(field.pickle(true).get === JObject("bool" -> JBool(true)))
+    assert(field.pickle(false).get === JObject("bool" -> JBool(false)))
   }
 
   property("ignored default values on pickle (field ?? <i>)") {
     forAll{ (a:Int, b:Int) =>
       val field = ("num" :: int) ?? a
-      val pickled = field.pickle(b)
+      val pickled = field.pickle(b).get
       if (a == b)
         assert(pickled === JObject())
       else
