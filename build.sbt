@@ -2,17 +2,17 @@ name := "jsonpicklers"
 
 organization := "com.jteigen"
 
-scalaVersion := "2.9.1"
+scalaVersion := "2.10.3"
 
 description := "A pickler library for json"
 
-libraryDependencies += "net.liftweb" %% "lift-json" % "2.4"
+libraryDependencies += "net.liftweb" %% "lift-json" % "2.5"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "1.7.1" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test"
 
-libraryDependencies += "org.scala-tools.testing" %% "scalacheck" % "1.9" % "test"
+libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.10.1" % "test"
 
-scalacOptions += "-unchecked"
+scalacOptions ++= Seq("-unchecked", "-feature", "-language:implicitConversions", "-language:higherKinds")
 
 releaseSettings
 

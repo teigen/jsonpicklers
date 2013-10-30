@@ -14,7 +14,7 @@ object Types {
         Success(new URL(s), location)
       } catch {
         case ex:MalformedURLException if noProtocol(ex.getMessage) => un("http://" + s, location)
-        case ex => Failure(ex.getMessage, location)
+        case ex:Exception => Failure(ex.getMessage, location)
       }      
       string.unpickle(location).flatMap{ s => un(s, location) }
     }

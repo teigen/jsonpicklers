@@ -16,7 +16,7 @@ object OrderingTest extends Properties("ordering") {
        
   property("value > (failure)") = forAll{ (a:Int, b:Int) =>
     val field = int > b
-    !(a > b) ==> (field.pickle(a) throws classOf[RuntimeException]) :| "pickle" &&
+    !(a > b) ==> throws(classOf[RuntimeException])(field.pickle(a)) :| "pickle" &&
     !(a > b) ==> field.unpickle(JInt(a)).isFailure                  :| "unpickle"
   }
 
@@ -36,7 +36,7 @@ object OrderingTest extends Properties("ordering") {
     val obj = value > Value(b)
     val json = JObject(List(JField("value", JInt(a))))
     
-    !(a > b) ==> (obj.pickle(Value(a)) throws classOf[RuntimeException]) :| "pickle" &&
+    !(a > b) ==> throws(classOf[RuntimeException])(obj.pickle(Value(a))) :| "pickle" &&
     !(a > b) ==> obj.unpickle(json).isFailure                            :| "unpickle"
   }
 

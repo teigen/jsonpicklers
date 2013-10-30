@@ -54,7 +54,7 @@ object Parsers {
   }
   
   def int = expect("Int"){
-    case JInt(v) if(v.isValidInt) => v.intValue()
+    case JInt(v) if v.isValidInt => v.intValue()
   }
   
   def string = expect("String"){
