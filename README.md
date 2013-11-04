@@ -1,3 +1,6 @@
+DEPRECATED: Use [Argonaut](http://argonaut.io/) instead
+==========
+
 Json pickler combinator library for Scala.
 
 Look at the [tests](https://github.com/teigen/jsonpicklers/tree/master/src/test/scala) for usage examples
